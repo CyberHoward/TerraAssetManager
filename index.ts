@@ -102,12 +102,12 @@ async function main() {
 	const LTV = await getLTV(borrowedValue, borrowedLimit)
 
 	if (SHOULD_BORROW_MORE && Number(LTV.toFixed(3)) < LTV_BORROW) {
-		log(`TVL is low (${LTV.toFixed(3)}%)`)
+		log(`LTV is low (${LTV.toFixed(3)}%)`)
 		log('Borrowing...')
 
 		const amount = computeBorrowAmount(borrowedValue, borrowedLimit)
 		await anchor.borrow.borrow({ amount: amount.toFixed(3), market: MARKET_DENOMS.UUSD }).execute(wallet, gasParameters)
-		log(`Borrowed ${amount.toFixed(3)} UST... TVL is now at ${LTV_SAFE}%`)
+		log(`Borrowed ${amount.toFixed(3)} UST... LTV is now at ${LTV_SAFE}%`)
 
 		await anchor.earn
 			.depositStable({ amount: amount.toFixed(3), market: MARKET_DENOMS.UUSD })
@@ -116,7 +116,7 @@ async function main() {
 	}
 
 	if (Number(LTV.toFixed(3)) > LTV_LIMIT) {
-		log(`TVL is too high (${LTV.toFixed(3)}%)`)
+		log(`LTV is too high (${LTV.toFixed(3)}%)`)
 		log('Repaying...')
 
 		const amount = computeRepayAmount(borrowedValue, borrowedLimit)
@@ -133,7 +133,7 @@ async function main() {
 		}
 
 		await anchor.borrow.repay({ amount: amount.toFixed(3), market: MARKET_DENOMS.UUSD }).execute(wallet, gasParameters)
-		log(`Repayed ${amount.toFixed(3)} UST... TVL is now at ${LTV_SAFE}%`)
+		log(`Repayed ${amount.toFixed(3)} UST... LTV is now at ${LTV_SAFE}%`)
 	}
 
 	setTimeout(main, TIMING)
