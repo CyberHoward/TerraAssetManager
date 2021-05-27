@@ -14,6 +14,7 @@ import {
 const TIMING = 10 * 1000
 const MICRO_MULTIPLIER = 1_000_000
 
+const TTY = Boolean(process.env.TTY) || false
 const BOT_API_KEY = process.env.BOT_API_KEY
 const BOT_CHAT_ID = process.env.BOT_CHAT_ID
 const LTV_LIMIT = Number(process.env.LTV_LIMIT) || 40
@@ -37,7 +38,9 @@ const walletDenom = {
 }
 
 function log(message: string) {
-	console.log(message)
+	if (TTY) {
+		console.log(message)
+	}
 
 	if (BOT_API_KEY && BOT_CHAT_ID) {
 		const encodedMessage = encodeURIComponent(message)
