@@ -133,7 +133,7 @@ async function main() {
 		}
 
 		await anchor.borrow.repay({ amount: amount.toFixed(3), market: MARKET_DENOMS.UUSD }).execute(wallet, gasParameters)
-		log(`Repayed ${amount.toFixed(3)} UST... LTV is now at ${LTV_SAFE}%`)
+		log(`Repaid ${amount.toFixed(3)} UST... LTV is now at ${LTV_SAFE}%`)
 	}
 
 	setTimeout(main, TIMING)
