@@ -1,6 +1,7 @@
 require('dotenv').config()
+import got from 'got'
 import Decimal from 'decimal.js'
-import { Denom, LCDClient, MarketAPI, MnemonicKey, Wallet } from '@terra-money/terra.js'
+import { Denom, LCDClient, MnemonicKey, Wallet } from '@terra-money/terra.js'
 import {
 	AddressProviderFromJson,
 	Anchor,
@@ -12,9 +13,13 @@ import {
 
 const TIMING = 10 * 1000
 const MICRO_MULTIPLIER = 1_000_000
+
+const BOT_API_KEY = process.env.BOT_API_KEY
+const BOT_CHAT_ID = process.env.BOT_CHAT_ID
 const LTV_LIMIT = Number(process.env.LTV_LIMIT) || 40
 const LTV_SAFE = Number(process.env.LTV_SAFE) || 35
 const LTV_BORROW = Number(process.env.LTV_BORROW) || 25
+const SHOULD_BORROW_MORE = Boolean(process.env.SHOULD_BORROW_MORE) || true
 
 const provider = process.env.CHAIN_ID === 'columbus-4' ? columbus4 : tequila0004
 const addressProvider = new AddressProviderFromJson(provider)
@@ -29,6 +34,16 @@ const gasParameters: OperationGasParameters = {
 const walletDenom = {
 	address: wallet.key.accAddress,
 	market: MARKET_DENOMS.UUSD,
+}
+
+function log(message: string) {
+	console.log(message)
+
+	if (BOT_API_KEY && BOT_CHAT_ID) {
+		const encodedMessage = encodeURIComponent(message)
+
+		got.post(`https://api.telegram.org/bot${BOT_API_KEY}/sendMessage?chat_id=${BOT_CHAT_ID}&text=${encodedMessage}`)
+	}
 }
 
 // function getDeposit() {
@@ -75,7 +90,7 @@ async function main() {
 	// const deposit = await getDeposit()
 
 	// if (Number(deposit) < 1) {
-	// 	console.log('Deposit amount is too small to be used.')
+	// 	log('Deposit amount is too small to be used.')
 	// 	process.exit(1)
 	// }
 
@@ -83,39 +98,39 @@ async function main() {
 	const borrowedLimit = await getBorrowLimit()
 	const LTV = await getLTV(borrowedValue, borrowedLimit)
 
-	if (Number(LTV.toFixed(3)) < LTV_BORROW) {
-		console.log(`TVL is low (${LTV.toFixed(3)}%)`)
-		console.log('Borrowing...')
+	if (SHOULD_BORROW_MORE && Number(LTV.toFixed(3)) < LTV_BORROW) {
+		log(`TVL is low (${LTV.toFixed(3)}%)`)
+		log('Borrowing...')
 
 		const amount = computeBorrowAmount(borrowedValue, borrowedLimit)
 		await anchor.borrow.borrow({ amount: amount.toFixed(3), market: MARKET_DENOMS.UUSD }).execute(wallet, gasParameters)
-		console.log(`Borrowed ${amount.toFixed(3)} UST... TVL is now at ${LTV_SAFE}%`)
+		log(`Borrowed ${amount.toFixed(3)} UST... TVL is now at ${LTV_SAFE}%`)
 
 		await anchor.earn
 			.depositStable({ amount: amount.toFixed(3), market: MARKET_DENOMS.UUSD })
 			.execute(wallet, gasParameters)
-		console.log(`Deposited ${amount.toFixed(3)} UST...`)
+		log(`Deposited ${amount.toFixed(3)} UST...`)
 	}
 
 	if (Number(LTV.toFixed(3)) > LTV_LIMIT) {
-		console.log(`TVL is too high (${LTV.toFixed(3)}%)`)
-		console.log('Repaying...')
+		log(`TVL is too high (${LTV.toFixed(3)}%)`)
+		log('Repaying...')
 
 		const amount = computeRepayAmount(borrowedValue, borrowedLimit)
 		const balance = await getWalletBalance()
 
 		if (balance.toNumber() < amount.toNumber()) {
-			console.log('Not enough in your wallet... withdrawing...')
+			log('Not enough in your wallet... withdrawing...')
 			const amountToWithdraw = amount.minus(balance).plus(5).toFixed(3)
 			await anchor.earn
 				.withdrawStable({ amount: amountToWithdraw, market: MARKET_DENOMS.UUSD })
 				.execute(wallet, gasParameters)
 
-			console.log(`Withdrawed ${amountToWithdraw} UST...`)
+			log(`Withdrawed ${amountToWithdraw} UST...`)
 		}
 
 		await anchor.borrow.repay({ amount: amount.toFixed(3), market: MARKET_DENOMS.UUSD }).execute(wallet, gasParameters)
-		console.log(`Repayed ${amount.toFixed(3)} UST... TVL is now at ${LTV_SAFE}%`)
+		log(`Repayed ${amount.toFixed(3)} UST... TVL is now at ${LTV_SAFE}%`)
 	}
 
 	setTimeout(main, TIMING)
