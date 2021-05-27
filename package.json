@@ -1,20 +1,25 @@
 {
   "name": "anchor-repay",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "private": true,
+  "author": "Romain Lanz <romain.lanz@pm.me>",
+  "license": "MIT",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "ts-node index.ts"
+  },
+  "homepage": "https://github.com/RomainLanz/anchor-repay#readme",
+  "dependencies": {
+    "@anchor-protocol/anchor.js": "^1.0.1",
+    "@terra-money/terra.js": "^1.8.0"
+  },
+  "devDependencies": {
+    "ts-node": "^10.0.0",
+    "typescript": "^4.3.2"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/RomainLanz/anchor-repay.git"
   },
-  "keywords": [],
-  "author": "Romain Lanz <romain.lanz@pm.me>",
-  "license": "MIT",
   "bugs": {
     "url": "https://github.com/RomainLanz/anchor-repay/issues"
-  },
-  "homepage": "https://github.com/RomainLanz/anchor-repay#readme"
+  }
 }
