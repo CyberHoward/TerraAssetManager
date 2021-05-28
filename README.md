@@ -49,6 +49,8 @@ This bot will notify you via a Telegram Bot for any transactions.
 You need to create your Telegram Bot to activate this feature. It can be quickly done [via the Telegram application](https://core.telegram.org/bots#6-botfather).
 Once you have your `token` and your `chatID` you can define those variables inside the `.env` file.
 
+<br />
+
 ## Testing
 
 If you would like to try the bot before running in production, you may want to use the Terra Testnet.
