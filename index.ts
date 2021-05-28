@@ -16,18 +16,20 @@ const LTV_LIMIT = Number(process.env.LTV_LIMIT) || 43
 const LTV_SAFE = Number(process.env.LTV_SAFE) || 35
 const LTV_BORROW = Number(process.env.LTV_BORROW) || 30
 const SHOULD_BORROW_MORE = Boolean(process.env.SHOULD_BORROW_MORE) || true
+const CRLF = '\n'
 
 const provider = process.env.CHAIN_ID === 'columbus-4' ? columbus4 : tequila0004
+
 const addressProvider = new AddressProviderFromJson(provider)
 const client = new LCDClient({
 	URL: process.env.LCD_URL as string,
 	chainID: process.env.CHAIN_ID as string,
 	gasPrices: '0.15uusd',
 })
-
 const key = new MnemonicKey({ mnemonic: process.env.KEY })
 const wallet = new Wallet(client, key)
 const anchor = new Anchor(client, addressProvider)
+
 const walletDenom = {
 	address: wallet.key.accAddress,
 	market: MARKET_DENOMS.UUSD,
@@ -85,14 +87,16 @@ log(dedent`|-----------------------------------------------
 	| Version: 0.1
 	| Made by Romain Lanz
 	|
+	| Network: ${process.env.CHAIN_ID === 'columbus-4' ? 'Mainnet' : 'Testnet'}
+	| Address:
+	| ${wallet.key.accAddress}
+	|
 	| Configuration:
-	|  - Network              ${process.env.CHAIN_ID === 'columbus-4' ? 'Mainnet' : 'Testnet'}
-	|  - Address              ${wallet.key.accAddress}
-	|  - LTV_SAFE             ${LTV_SAFE}
-	|  - LTV_LIMIT            ${LTV_LIMIT}
-	|  - LTV_BORROW           ${LTV_BORROW}
-	|  - SHOULD_BORROW_MORE   ${SHOULD_BORROW_MORE}
-	|  - MAX_FAILURE          ${MAX_FAILURE}
+	|  - LTV_SAFE: ${LTV_SAFE}%
+	|  - LTV_LIMIT: ${LTV_LIMIT}%
+	|  - LTV_BORROW: ${LTV_BORROW}%
+	|  - SHOULD_BORROW_MORE: ${SHOULD_BORROW_MORE}
+	|  - MAX_FAILURE: ${MAX_FAILURE}
 	|
 `)
 
@@ -104,8 +108,7 @@ async function main() {
 		const LTV = getLTV(borrowedValue, borrowedLimit)
 
 		if (SHOULD_BORROW_MORE && Number(LTV.toFixed(3)) < LTV_BORROW) {
-			log(`LTV is low (${LTV.toFixed(3)}%)`)
-			log('Borrowing...')
+			log(`LTV is under limit (${LTV.toFixed(3)}%)... borrowing...`)
 
 			const amount = computeAmountToBorrow(borrowedValue, borrowedLimit)
 
@@ -124,23 +127,23 @@ async function main() {
 		}
 
 		if (Number(LTV.toFixed(3)) > LTV_LIMIT) {
-			log(`LTV is too high (${LTV.toFixed(3)}%)`)
-			log('Repaying...')
+			log(`LTV is too high (${LTV.toFixed(3)}%)... repaying...`)
 
 			const amount = computeAmountToRepay(borrowedValue, borrowedLimit)
 			const balance = await getWalletBalance()
 			let msgs = []
+			let logMsgs = []
 
-			if (balance.toNumber() < amount.toNumber()) {
-				log('Not enough in your wallet... withdrawing...')
+			if (balance.minus(10).toNumber() < amount.toNumber()) {
+				logMsgs.push('Not enough liquidity in your wallet... withdrawing...')
 
-				const amountToWithdraw = amount.minus(balance).plus(5).toFixed(3)
+				const amountToWithdraw = amount.minus(balance).plus(7).toFixed(3)
 				const withdrawMessage = anchor.earn
 					.withdrawStable({ amount: amountToWithdraw, market: MARKET_DENOMS.UUSD })
 					.generateWithWallet(wallet)
 
 				msgs.push(...withdrawMessage)
-				log(`Will withdraw ${amountToWithdraw} UST...`)
+				logMsgs.push(`Withdrawed ${amountToWithdraw} UST...`)
 			}
 
 			const borrowMessage = anchor.borrow
@@ -150,7 +153,8 @@ async function main() {
 			const tx = await wallet.createAndSignTx({ msgs: [...msgs, ...borrowMessage] })
 			await client.tx.broadcast(tx)
 
-			log(`Repaid ${amount.toFixed(3)} UST... LTV is now at ${LTV_SAFE}%`)
+			logMsgs.push(`Repaid ${amount.toFixed(3)} UST... LTV is now at ${LTV_SAFE}%`)
+			log(logMsgs.join(CRLF))
 		}
 	} catch (e) {
 		log('An error occured')
