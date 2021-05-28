@@ -81,11 +81,11 @@ function getLTV(borrowedValue: Decimal, borrowedLimit: Decimal) {
 	return borrowedValue.dividedBy(borrowedLimit.times(2)).times(100)
 }
 
-function computeRepayAmount(borrowedValue: Decimal, borrowedLimit: Decimal) {
+function computeAmountToRepay(borrowedValue: Decimal, borrowedLimit: Decimal) {
 	return borrowedValue.minus(new Decimal(LTV_SAFE).times(borrowedLimit.times(2)).dividedBy(100))
 }
 
-function computeBorrowAmount(borrowedValue: Decimal, borrowedLimit: Decimal) {
+function computeAmountToBorrow(borrowedValue: Decimal, borrowedLimit: Decimal) {
 	return new Decimal(LTV_SAFE).times(borrowedLimit.times(2)).dividedBy(100).minus(borrowedValue)
 }
 
@@ -105,7 +105,7 @@ async function main() {
 		log(`LTV is low (${LTV.toFixed(3)}%)`)
 		log('Borrowing...')
 
-		const amount = computeBorrowAmount(borrowedValue, borrowedLimit)
+		const amount = computeAmountToBorrow(borrowedValue, borrowedLimit)
 		await anchor.borrow.borrow({ amount: amount.toFixed(3), market: MARKET_DENOMS.UUSD }).execute(wallet, gasParameters)
 		log(`Borrowed ${amount.toFixed(3)} UST... LTV is now at ${LTV_SAFE}%`)
 
@@ -119,7 +119,7 @@ async function main() {
 		log(`LTV is too high (${LTV.toFixed(3)}%)`)
 		log('Repaying...')
 
-		const amount = computeRepayAmount(borrowedValue, borrowedLimit)
+		const amount = computeAmountToRepay(borrowedValue, borrowedLimit)
 		const balance = await getWalletBalance()
 
 		if (balance.toNumber() < amount.toNumber()) {
