@@ -56,4 +56,4 @@ Once you have your `token` and your `chatID` you can define those variables insi
 If you would like to try the bot before running in production, you may want to use the Terra Testnet.
 You can add fake money to your Testnet Wallet using https://faucet.terra.money/.
 
-We also provide a dry-run option to not execute any transactions and only notify you ([[#6](https://github.com/RomainLanz/anchor-borrow-bot/issues/6)]).
+We also provide a dry-run option to not execute any transactions and only notify you ([#6](https://github.com/RomainLanz/anchor-borrow-bot/issues/6)).

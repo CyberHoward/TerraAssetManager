@@ -45,16 +45,14 @@ function log(message: string) {
 	if (BOT_API_KEY && BOT_CHAT_ID) {
 		const encodedMessage = encodeURIComponent(message)
 
-		got.post(`https://api.telegram.org/bot${BOT_API_KEY}/sendMessage?chat_id=${BOT_CHAT_ID}&text=${encodedMessage}`)
+		got
+			.post(`https://api.telegram.org/bot${BOT_API_KEY}/sendMessage?chat_id=${BOT_CHAT_ID}&text=${encodedMessage}`)
+			.catch(() => {})
 	}
 }
 
 // function getDeposit() {
 // 	return anchor.earn.getTotalDeposit(walletDenom)
-// }
-
-// function sleep(ms: number) {
-// 	return new Promise((resolve) => setTimeout(resolve, ms))
 // }
 
 async function getWalletBalance() {
@@ -90,50 +88,59 @@ function computeAmountToBorrow(borrowedValue: Decimal, borrowedLimit: Decimal) {
 }
 
 async function main() {
-	// const deposit = await getDeposit()
+	try {
+		// const deposit = await getDeposit()
 
-	// if (Number(deposit) < 1) {
-	// 	log('Deposit amount is too small to be used.')
-	// 	process.exit(1)
-	// }
+		// if (Number(deposit) < 1) {
+		// 	log('Deposit amount is too small to be used.')
+		// 	process.exit(1)
+		// }
 
-	const borrowedValue = await getBorrowedValue()
-	const borrowedLimit = await getBorrowLimit()
-	const LTV = getLTV(borrowedValue, borrowedLimit)
+		const borrowedValue = await getBorrowedValue()
+		const borrowedLimit = await getBorrowLimit()
+		const LTV = getLTV(borrowedValue, borrowedLimit)
 
-	if (SHOULD_BORROW_MORE && Number(LTV.toFixed(3)) < LTV_BORROW) {
-		log(`LTV is low (${LTV.toFixed(3)}%)`)
-		log('Borrowing...')
+		if (SHOULD_BORROW_MORE && Number(LTV.toFixed(3)) < LTV_BORROW) {
+			log(`LTV is low (${LTV.toFixed(3)}%)`)
+			log('Borrowing...')
 
-		const amount = computeAmountToBorrow(borrowedValue, borrowedLimit)
-		await anchor.borrow.borrow({ amount: amount.toFixed(3), market: MARKET_DENOMS.UUSD }).execute(wallet, gasParameters)
-		log(`Borrowed ${amount.toFixed(3)} UST... LTV is now at ${LTV_SAFE}%`)
-
-		await anchor.earn
-			.depositStable({ amount: amount.toFixed(3), market: MARKET_DENOMS.UUSD })
-			.execute(wallet, gasParameters)
-		log(`Deposited ${amount.toFixed(3)} UST...`)
-	}
-
-	if (Number(LTV.toFixed(3)) > LTV_LIMIT) {
-		log(`LTV is too high (${LTV.toFixed(3)}%)`)
-		log('Repaying...')
-
-		const amount = computeAmountToRepay(borrowedValue, borrowedLimit)
-		const balance = await getWalletBalance()
-
-		if (balance.toNumber() < amount.toNumber()) {
-			log('Not enough in your wallet... withdrawing...')
-			const amountToWithdraw = amount.minus(balance).plus(5).toFixed(3)
-			await anchor.earn
-				.withdrawStable({ amount: amountToWithdraw, market: MARKET_DENOMS.UUSD })
+			const amount = computeAmountToBorrow(borrowedValue, borrowedLimit)
+			await anchor.borrow
+				.borrow({ amount: amount.toFixed(3), market: MARKET_DENOMS.UUSD })
 				.execute(wallet, gasParameters)
+			log(`Borrowed ${amount.toFixed(3)} UST... LTV is now at ${LTV_SAFE}%`)
 
-			log(`Withdrawed ${amountToWithdraw} UST...`)
+			await anchor.earn
+				.depositStable({ amount: amount.toFixed(3), market: MARKET_DENOMS.UUSD })
+				.execute(wallet, gasParameters)
+			log(`Deposited ${amount.toFixed(3)} UST...`)
 		}
 
-		await anchor.borrow.repay({ amount: amount.toFixed(3), market: MARKET_DENOMS.UUSD }).execute(wallet, gasParameters)
-		log(`Repaid ${amount.toFixed(3)} UST... LTV is now at ${LTV_SAFE}%`)
+		if (Number(LTV.toFixed(3)) > LTV_LIMIT) {
+			log(`LTV is too high (${LTV.toFixed(3)}%)`)
+			log('Repaying...')
+
+			const amount = computeAmountToRepay(borrowedValue, borrowedLimit)
+			const balance = await getWalletBalance()
+
+			if (balance.toNumber() < amount.toNumber()) {
+				log('Not enough in your wallet... withdrawing...')
+				const amountToWithdraw = amount.minus(balance).plus(5).toFixed(3)
+				await anchor.earn
+					.withdrawStable({ amount: amountToWithdraw, market: MARKET_DENOMS.UUSD })
+					.execute(wallet, gasParameters)
+
+				log(`Withdrawed ${amountToWithdraw} UST...`)
+			}
+
+			await anchor.borrow
+				.repay({ amount: amount.toFixed(3), market: MARKET_DENOMS.UUSD })
+				.execute(wallet, gasParameters)
+			log(`Repaid ${amount.toFixed(3)} UST... LTV is now at ${LTV_SAFE}%`)
+		}
+	} catch (e) {
+		log('An error occured')
+		log(JSON.stringify(e))
 	}
 
 	setTimeout(main, TIMING)
