@@ -1,5 +1,6 @@
 require('dotenv').config()
 import got from 'got'
+import dedent from 'dedent-js'
 import Decimal from 'decimal.js'
 import { Denom, LCDClient, MnemonicKey, Wallet } from '@terra-money/terra.js'
 import { AddressProviderFromJson, Anchor, columbus4, MARKET_DENOMS, tequila0004 } from '@anchor-protocol/anchor.js'
@@ -77,6 +78,23 @@ function computeAmountToRepay(borrowedValue: Decimal, borrowedLimit: Decimal) {
 function computeAmountToBorrow(borrowedValue: Decimal, borrowedLimit: Decimal) {
 	return new Decimal(LTV_SAFE).times(borrowedLimit.times(2)).dividedBy(100).minus(borrowedValue)
 }
+
+log(dedent`|-----------------------------------------------
+	| Your are using the Anchor Borrow / Repay Bot
+	|-----------------------------------------------
+	| Version: 0.1
+	| Made by Romain Lanz
+	|
+	| Configuration:
+	|  - Network              ${process.env.CHAIN_ID === 'columbus-4' ? 'Mainnet' : 'Testnet'}
+	|  - Address              ${wallet.key.accAddress}
+	|  - LTV_SAFE             ${LTV_SAFE}
+	|  - LTV_LIMIT            ${LTV_LIMIT}
+	|  - LTV_BORROW           ${LTV_BORROW}
+	|  - SHOULD_BORROW_MORE   ${SHOULD_BORROW_MORE}
+	|  - MAX_FAILURE          ${MAX_FAILURE}
+	|
+`)
 
 let failure = 0
 async function main() {
