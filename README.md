@@ -13,10 +13,10 @@ If your LTV is higher than `LTV_LIMIT` (43% per default), the bot will try to re
 
 1. We verify the balance of your wallet to see if you have enough money to repay;
 2. We verify the balance of your deposit to see if you can withdraw from it to repay;
-3. We verify if you have any unclaimed reward that we can claim and sell to repay (https://github.com/RomainLanz/anchor-borrow-bot/issues/1);
-4. We verify if you have any token stake in governance that we can unstake and sell to repay (https://github.com/RomainLanz/anchor-borrow-bot/issues/3).
+3. We verify if you have any unclaimed reward that we can claim and sell to repay ([#1](https://github.com/RomainLanz/anchor-borrow-bot/issues/1));
+4. We verify if you have any token stake in governance that we can unstake and sell to repay ([#3](https://github.com/RomainLanz/anchor-borrow-bot/issues/)).
 
-> :information_source: If we need to claim any rewards, we will sell only the required amount and stake in governance the rest of your token. (https://github.com/RomainLanz/anchor-borrow-bot/issues/2)
+> :information_source: If we need to claim any rewards, we will sell only the required amount and stake in governance the rest of your token. ([#2](https://github.com/RomainLanz/anchor-borrow-bot/issues/))
 
 If your LTV is lower than `LTV_BORROW` (30% per default), the bot will borrow more and bump the TVL to `LTV_SAFE` (35% per default)` and deposit the amount borrowed.
 
