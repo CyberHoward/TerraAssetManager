@@ -37,7 +37,7 @@ Once you have `node` and `npm` accessible in your terminal's path, you will need
 3. Copy the `.env.example` file to `.env` and fill all values (`cp .env.example .env`);
 4. Run the bot with `npm run start`.
 
-> :information_source: To run the bot in a background process, we recommend using to tool [`pm2`](https://github.com/Unitech/pm2).
+> :information_source: To run the bot in a background process, we recommend using a tool [`pm2`](https://github.com/Unitech/pm2).
 
 <br />
 
@@ -45,5 +45,5 @@ Once you have `node` and `npm` accessible in your terminal's path, you will need
 
 This bot will notify you via a Telegram Bot for any transactions.
 
-You need to create your Telegram Bot to activate this feature. It can be done quickly [via the Telegram application](https://core.telegram.org/bots#6-botfather).
+You need to create your Telegram Bot to activate this feature. It can be quickly done [via the Telegram application](https://core.telegram.org/bots#6-botfather).
 Once you have your `token` and your `chatID` you can define those variables inside the `.env` file.
