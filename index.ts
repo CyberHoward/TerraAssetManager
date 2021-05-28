@@ -2,17 +2,11 @@ require('dotenv').config()
 import got from 'got'
 import Decimal from 'decimal.js'
 import { Denom, LCDClient, MnemonicKey, Wallet } from '@terra-money/terra.js'
-import {
-	AddressProviderFromJson,
-	Anchor,
-	columbus4,
-	MARKET_DENOMS,
-	OperationGasParameters,
-	tequila0004,
-} from '@anchor-protocol/anchor.js'
+import { AddressProviderFromJson, Anchor, columbus4, MARKET_DENOMS, tequila0004 } from '@anchor-protocol/anchor.js'
 
 const MICRO_MULTIPLIER = 1_000_000
 
+const MAX_FAILURE = Number(process.env.MAX_FAILURE) || 3
 const TIMING = (Number(process.env.WAIT_FOR) || 10) * 1000
 const TTY = Boolean(process.env.TTY) || false
 const BOT_API_KEY = process.env.BOT_API_KEY
@@ -84,6 +78,7 @@ function computeAmountToBorrow(borrowedValue: Decimal, borrowedLimit: Decimal) {
 	return new Decimal(LTV_SAFE).times(borrowedLimit.times(2)).dividedBy(100).minus(borrowedValue)
 }
 
+let failure = 0
 async function main() {
 	try {
 		const borrowedValue = await getBorrowedValue()
@@ -107,8 +102,7 @@ async function main() {
 			const tx = await wallet.createAndSignTx({ msgs: [...borrowMessages, ...depositMessages] })
 			await client.tx.broadcast(tx)
 
-			log(`Borrowed ${amount.toFixed(3)} UST... LTV is now at ${LTV_SAFE}%`)
-			log(`Deposited ${amount.toFixed(3)} UST...`)
+			log(`Borrowed & Deposited ${amount.toFixed(3)} UST... LTV is now at ${LTV_SAFE}%`)
 		}
 
 		if (Number(LTV.toFixed(3)) > LTV_LIMIT) {
@@ -143,6 +137,12 @@ async function main() {
 	} catch (e) {
 		log('An error occured')
 		log(JSON.stringify(e))
+		failure++
+
+		if (failure >= MAX_FAILURE) {
+			log('Reaching max failure, exiting')
+			process.exit(1)
+		}
 	}
 
 	setTimeout(main, TIMING)
