@@ -24,14 +24,15 @@ const SHOULD_BORROW_MORE = Boolean(process.env.SHOULD_BORROW_MORE) || true
 
 const provider = process.env.CHAIN_ID === 'columbus-4' ? columbus4 : tequila0004
 const addressProvider = new AddressProviderFromJson(provider)
-const client = new LCDClient({ URL: process.env.LCD_URL as string, chainID: process.env.CHAIN_ID as string })
+const client = new LCDClient({
+	URL: process.env.LCD_URL as string,
+	chainID: process.env.CHAIN_ID as string,
+	gasPrices: '0.15uusd',
+})
+
 const key = new MnemonicKey({ mnemonic: process.env.KEY })
 const wallet = new Wallet(client, key)
 const anchor = new Anchor(client, addressProvider)
-const gasParameters: OperationGasParameters = {
-	gasAdjustment: 1.5,
-	gasPrices: '0.15uusd',
-}
 const walletDenom = {
 	address: wallet.key.accAddress,
 	market: MARKET_DENOMS.UUSD,
@@ -50,10 +51,6 @@ function log(message: string) {
 			.catch(() => {})
 	}
 }
-
-// function getDeposit() {
-// 	return anchor.earn.getTotalDeposit(walletDenom)
-// }
 
 async function getWalletBalance() {
 	const balance = (await client.bank.balance(wallet.key.accAddress)).get(Denom.USD)
@@ -89,13 +86,6 @@ function computeAmountToBorrow(borrowedValue: Decimal, borrowedLimit: Decimal) {
 
 async function main() {
 	try {
-		// const deposit = await getDeposit()
-
-		// if (Number(deposit) < 1) {
-		// 	log('Deposit amount is too small to be used.')
-		// 	process.exit(1)
-		// }
-
 		const borrowedValue = await getBorrowedValue()
 		const borrowedLimit = await getBorrowLimit()
 		const LTV = getLTV(borrowedValue, borrowedLimit)
@@ -105,14 +95,19 @@ async function main() {
 			log('Borrowing...')
 
 			const amount = computeAmountToBorrow(borrowedValue, borrowedLimit)
-			await anchor.borrow
-				.borrow({ amount: amount.toFixed(3), market: MARKET_DENOMS.UUSD })
-				.execute(wallet, gasParameters)
-			log(`Borrowed ${amount.toFixed(3)} UST... LTV is now at ${LTV_SAFE}%`)
 
-			await anchor.earn
+			const borrowMessages = anchor.borrow
+				.borrow({ amount: amount.toFixed(3), market: MARKET_DENOMS.UUSD })
+				.generateWithWallet(wallet)
+
+			const depositMessages = anchor.earn
 				.depositStable({ amount: amount.toFixed(3), market: MARKET_DENOMS.UUSD })
-				.execute(wallet, gasParameters)
+				.generateWithWallet(wallet)
+
+			const tx = await wallet.createAndSignTx({ msgs: [...borrowMessages, ...depositMessages] })
+			await client.tx.broadcast(tx)
+
+			log(`Borrowed ${amount.toFixed(3)} UST... LTV is now at ${LTV_SAFE}%`)
 			log(`Deposited ${amount.toFixed(3)} UST...`)
 		}
 
@@ -122,20 +117,27 @@ async function main() {
 
 			const amount = computeAmountToRepay(borrowedValue, borrowedLimit)
 			const balance = await getWalletBalance()
+			let msgs = []
 
 			if (balance.toNumber() < amount.toNumber()) {
 				log('Not enough in your wallet... withdrawing...')
-				const amountToWithdraw = amount.minus(balance).plus(5).toFixed(3)
-				await anchor.earn
-					.withdrawStable({ amount: amountToWithdraw, market: MARKET_DENOMS.UUSD })
-					.execute(wallet, gasParameters)
 
-				log(`Withdrawed ${amountToWithdraw} UST...`)
+				const amountToWithdraw = amount.minus(balance).plus(5).toFixed(3)
+				const withdrawMessage = anchor.earn
+					.withdrawStable({ amount: amountToWithdraw, market: MARKET_DENOMS.UUSD })
+					.generateWithWallet(wallet)
+
+				msgs.push(...withdrawMessage)
+				log(`Will withdraw ${amountToWithdraw} UST...`)
 			}
 
-			await anchor.borrow
+			const borrowMessage = anchor.borrow
 				.repay({ amount: amount.toFixed(3), market: MARKET_DENOMS.UUSD })
-				.execute(wallet, gasParameters)
+				.generateWithWallet(wallet)
+
+			const tx = await wallet.createAndSignTx({ msgs: [...msgs, ...borrowMessage] })
+			await client.tx.broadcast(tx)
+
 			log(`Repaid ${amount.toFixed(3)} UST... LTV is now at ${LTV_SAFE}%`)
 		}
 	} catch (e) {
