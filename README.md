@@ -33,7 +33,7 @@ Once you have `node` and `npm` accessible in your terminal's path, you will need
 3. Copy the `.env.example` file to `.env` and fill all values (`cp .env.example .env`);
 4. Run the bot with `npm run start`.
 
-> :information_source To run the bot in a background process, we recommend using to tool [`pm2`](https://github.com/Unitech/pm2).
+> :information_source: To run the bot in a background process, we recommend using to tool [`pm2`](https://github.com/Unitech/pm2).
 
 ## Setup Telegram Notification
 
