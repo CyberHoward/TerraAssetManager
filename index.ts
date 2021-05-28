@@ -1,6 +1,5 @@
 require('dotenv').config()
 import got from 'got'
-import dedent from 'dedent-js'
 import Decimal from 'decimal.js'
 import { Denom, LCDClient, MnemonicKey, Wallet } from '@terra-money/terra.js'
 import { AddressProviderFromJson, Anchor, columbus4, MARKET_DENOMS, tequila0004 } from '@anchor-protocol/anchor.js'
@@ -41,11 +40,18 @@ function log(message: string) {
 	}
 
 	if (BOT_API_KEY && BOT_CHAT_ID) {
-		const encodedMessage = encodeURIComponent(message)
-
 		got
-			.post(`https://api.telegram.org/bot${BOT_API_KEY}/sendMessage?chat_id=${BOT_CHAT_ID}&text=${encodedMessage}`)
-			.catch(() => {})
+			.post(`https://api.telegram.org/bot${BOT_API_KEY}/sendMessage`, {
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					chat_id: BOT_CHAT_ID,
+					text: message,
+					parse_mode: 'HTML',
+				}),
+			})
+			.catch()
 	}
 }
 
@@ -81,23 +87,21 @@ function computeAmountToBorrow(borrowedValue: Decimal, borrowedLimit: Decimal) {
 	return new Decimal(LTV_SAFE).times(borrowedLimit.times(2)).dividedBy(100).minus(borrowedValue)
 }
 
-log(dedent`|-----------------------------------------------
-	| Your are using the Anchor Borrow / Repay Bot
-	|-----------------------------------------------
-	| Version: 0.1
-	| Made by Romain Lanz
-	|
-	| Network: ${process.env.CHAIN_ID === 'columbus-4' ? 'Mainnet' : 'Testnet'}
-	| Address:
-	| ${wallet.key.accAddress}
-	|
-	| Configuration:
-	|  - LTV_SAFE: ${LTV_SAFE}%
-	|  - LTV_LIMIT: ${LTV_LIMIT}%
-	|  - LTV_BORROW: ${LTV_BORROW}%
-	|  - SHOULD_BORROW_MORE: ${SHOULD_BORROW_MORE}
-	|  - MAX_FAILURE: ${MAX_FAILURE}
-	|
+log(`<b>v0.1 - Anchor Borrow / Repay Bot</b>
+Made by Romain Lanz
+
+<b>Network:</b> <code>${process.env.CHAIN_ID === 'columbus-4' ? 'Mainnet' : 'Testnet'}</code>
+<b>Address:</b>
+<a href="https://finder.terra.money/${process.env.CHAIN_ID}/address/${wallet.key.accAddress}">
+	${wallet.key.accAddress}
+</a>
+
+<u>Configuration:</u>
+  - <b>LTV_SAFE:</b> <code>${LTV_SAFE}%</code>
+  - <b>LTV_LIMIT:</b> <code>${LTV_LIMIT}%</code>
+  - <b>LTV_BORROW:</b> <code>${LTV_BORROW}%</code>
+  - <b>SHOULD_BORROW_MORE:</b> <code>${SHOULD_BORROW_MORE}</code>
+  - <b>MAX_FAILURE:</b> <code>${MAX_FAILURE}</code>
 `)
 
 let failure = 0
@@ -108,7 +112,7 @@ async function main() {
 		const LTV = getLTV(borrowedValue, borrowedLimit)
 
 		if (SHOULD_BORROW_MORE && Number(LTV.toFixed(3)) < LTV_BORROW) {
-			log(`LTV is under limit (${LTV.toFixed(3)}%)... borrowing...`)
+			log(`LTV is under <code>${LTV.toFixed(3)}%</code>... borrowing...`)
 
 			const amount = computeAmountToBorrow(borrowedValue, borrowedLimit)
 
@@ -123,11 +127,11 @@ async function main() {
 			const tx = await wallet.createAndSignTx({ msgs: [...borrowMessages, ...depositMessages] })
 			await client.tx.broadcast(tx)
 
-			log(`Borrowed & Deposited ${amount.toFixed(3)} UST... LTV is now at ${LTV_SAFE}%`)
+			log(`Borrowed & Deposited <code>${amount.toFixed(3)} UST</code>... LTV is now at ${LTV_SAFE}%`)
 		}
 
 		if (Number(LTV.toFixed(3)) > LTV_LIMIT) {
-			log(`LTV is too high (${LTV.toFixed(3)}%)... repaying...`)
+			log(`LTV is higher than <code>${LTV.toFixed(3)}%</code>... repaying...`)
 
 			const amount = computeAmountToRepay(borrowedValue, borrowedLimit)
 			const balance = await getWalletBalance()
@@ -143,7 +147,7 @@ async function main() {
 					.generateWithWallet(wallet)
 
 				msgs.push(...withdrawMessage)
-				logMsgs.push(`Withdrawed ${amountToWithdraw} UST...`)
+				logMsgs.push(`Withdrawed <code>${amountToWithdraw} UST</code>...`)
 			}
 
 			const borrowMessage = anchor.borrow
@@ -153,7 +157,7 @@ async function main() {
 			const tx = await wallet.createAndSignTx({ msgs: [...msgs, ...borrowMessage] })
 			await client.tx.broadcast(tx)
 
-			logMsgs.push(`Repaid ${amount.toFixed(3)} UST... LTV is now at ${LTV_SAFE}%`)
+			logMsgs.push(`Repaid <code>${amount.toFixed(3)} UST</code>... LTV is now at ${LTV_SAFE}%`)
 			log(logMsgs.join(CRLF))
 		}
 	} catch (e) {
