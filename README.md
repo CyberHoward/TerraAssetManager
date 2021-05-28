@@ -1,6 +1,6 @@
 # Anchor Borrow / Repay bot
 
-The main goal of this bot is to avoid being liquidated due to the price volatility of bLuna, by repaying part of your debt when the TVL is too high.
+The main goal of this bot is to avoid being liquidated due to the price volatility of bLuna, by repaying part of your debt when the LTV is too high.
 
 > :warning: You will need to **use your private key** to let the bot create and sign transactions.
 > We highly recommend to **create a dedicated wallet** and **we decline all responsibility if you lose any money**.
