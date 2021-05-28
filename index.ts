@@ -11,15 +11,15 @@ import {
 	tequila0004,
 } from '@anchor-protocol/anchor.js'
 
-const TIMING = 10 * 1000
 const MICRO_MULTIPLIER = 1_000_000
 
+const TIMING = (Number(process.env.WAIT_FOR) || 10) * 1000
 const TTY = Boolean(process.env.TTY) || false
 const BOT_API_KEY = process.env.BOT_API_KEY
 const BOT_CHAT_ID = process.env.BOT_CHAT_ID
-const LTV_LIMIT = Number(process.env.LTV_LIMIT) || 40
+const LTV_LIMIT = Number(process.env.LTV_LIMIT) || 43
 const LTV_SAFE = Number(process.env.LTV_SAFE) || 35
-const LTV_BORROW = Number(process.env.LTV_BORROW) || 25
+const LTV_BORROW = Number(process.env.LTV_BORROW) || 30
 const SHOULD_BORROW_MORE = Boolean(process.env.SHOULD_BORROW_MORE) || true
 
 const provider = process.env.CHAIN_ID === 'columbus-4' ? columbus4 : tequila0004
