@@ -29,7 +29,7 @@ const key = new MnemonicKey({ mnemonic: process.env.KEY })
 const wallet = new Wallet(client, key)
 const anchor = new Anchor(client, addressProvider)
 const gasParameters: OperationGasParameters = {
-	gasAdjustment: 1.4,
+	gasAdjustment: 1.5,
 	gasPrices: '0.15uusd',
 }
 const walletDenom = {
@@ -77,7 +77,7 @@ async function getBorrowLimit() {
 	return new Decimal(borrowedLimit)
 }
 
-async function getLTV(borrowedValue: Decimal, borrowedLimit: Decimal) {
+function getLTV(borrowedValue: Decimal, borrowedLimit: Decimal) {
 	return borrowedValue.dividedBy(borrowedLimit.times(2)).times(100)
 }
 
@@ -99,7 +99,7 @@ async function main() {
 
 	const borrowedValue = await getBorrowedValue()
 	const borrowedLimit = await getBorrowLimit()
-	const LTV = await getLTV(borrowedValue, borrowedLimit)
+	const LTV = getLTV(borrowedValue, borrowedLimit)
 
 	if (SHOULD_BORROW_MORE && Number(LTV.toFixed(3)) < LTV_BORROW) {
 		log(`LTV is low (${LTV.toFixed(3)}%)`)
