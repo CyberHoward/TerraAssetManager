@@ -47,7 +47,9 @@ Once you have `node` and `npm` accessible in your terminal's path, you will need
 This bot will notify you via a Telegram Bot for any transactions.
 
 You need to create your Telegram Bot to activate this feature. It can be quickly done [via the Telegram application](https://core.telegram.org/bots#6-botfather).
-Once you have your `token` and your `chatID` you can define those variables inside the `.env` file.
+Once you have your `token` and your `chat_id` you can define those variables inside the `.env` file.
+
+> :information_source: The `chat_id` is your user ID. You can have it when sending `/getid` to [IDBot](https://t.me/myidbot).
 
 <br />
 
