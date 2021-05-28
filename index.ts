@@ -75,6 +75,31 @@ async function getBorrowLimit() {
 	return new Decimal(borrowedLimit)
 }
 
+async function getDeposit() {
+	const deposit = await anchor.earn.getTotalDeposit(walletDenom)
+	return new Decimal(deposit)
+}
+
+async function getAncBalance() {
+	const rewards = await anchor.anchorToken.getBalance(wallet.key.accAddress)
+	return new Decimal(rewards)
+}
+
+async function getANCPrice() {
+	const balance = await anchor.anchorToken.getANCPrice()
+	return new Decimal(balance)
+}
+
+async function getAncStakedAmount() {
+	const result = (await anchor.anchorToken.getStaker({ address: wallet.key.accAddress })) as Record<string, string>
+
+	if ('balance' in result) {
+		return new Decimal(result.balance).dividedBy(MICRO_MULTIPLIER)
+	}
+
+	return new Decimal(0)
+}
+
 function getLTV(borrowedValue: Decimal, borrowedLimit: Decimal) {
 	return borrowedValue.dividedBy(borrowedLimit.times(2)).times(100)
 }
@@ -139,15 +164,53 @@ async function main() {
 			let logMsgs = []
 
 			if (balance.minus(10).toNumber() < amount.toNumber()) {
-				logMsgs.push('Not enough liquidity in your wallet... withdrawing...')
+				logMsgs.push('Insufficient liquidity in your wallet... withdrawing...')
 
 				const amountToWithdraw = amount.minus(balance).plus(7).toFixed(3)
-				const withdrawMessage = anchor.earn
-					.withdrawStable({ amount: amountToWithdraw, market: MARKET_DENOMS.UUSD })
-					.generateWithWallet(wallet)
+				const depositAmount = await getDeposit()
 
-				msgs.push(...withdrawMessage)
-				logMsgs.push(`Withdrawed <code>${amountToWithdraw} UST</code>...`)
+				if (depositAmount.toNumber() > amount.toNumber()) {
+					const withdrawMessage = anchor.earn
+						.withdrawStable({ amount: amountToWithdraw, market: MARKET_DENOMS.UUSD })
+						.generateWithWallet(wallet)
+
+					msgs.push(...withdrawMessage)
+					logMsgs.push(`Withdrawed <code>${amountToWithdraw} UST</code>...`)
+				} else {
+					logMsgs.push('Insufficient deposit... trying to claim...')
+					await anchor.anchorToken.claimUSTBorrowRewards({ market: MARKET_DENOMS.UUSD }).execute(wallet, {})
+					const ancBalance = await getAncBalance()
+					const ancPrice = await getANCPrice()
+
+					if (ancPrice.times(ancBalance).toNumber() > amount.toNumber()) {
+						const quantityToSell = amount.dividedBy(ancPrice)
+						const sellAncMessage = anchor.anchorToken.sellANC(quantityToSell.toFixed(3)).generateWithWallet(wallet)
+						msgs.push(...sellAncMessage)
+						logMsgs.push(
+							`Sold <code>${quantityToSell.toFixed(3)} ANC</code> at <code>${ancPrice.toFixed(3)} UST</code> per ANC...`
+						)
+
+						const toStake = ancBalance.minus(quantityToSell)
+						const stakeMessage = anchor.anchorToken
+							.stakeVotingTokens({ amount: toStake.toFixed(3) })
+							.generateWithWallet(wallet)
+						msgs.push(...stakeMessage)
+						logMsgs.push(`Staked <code>${toStake.toFixed(3)} ANC</code>...`)
+					} else {
+						// @see https://github.com/Anchor-Protocol/anchor.js/issues/22
+						// logMsgs.push('Insufficient ANC balance... trying to unstake...')
+						// const ancBalance = await getAncStakedAmount()
+
+						// if (ancPrice.times(ancBalance).toNumber() > amount.toNumber()) {
+						// 	const quantityToUnstake = amount.dividedBy(ancPrice)
+						// } else {
+						// logMsgs.push(`Insufficient staked ANC balance...`)
+						logMsgs.push(`Impossible to repay <code>${amount.toFixed(3)} UST</code>`)
+						log(logMsgs.join(CRLF))
+						return
+						// }
+					}
+				}
 			}
 
 			const borrowMessage = anchor.borrow
@@ -157,12 +220,12 @@ async function main() {
 			const tx = await wallet.createAndSignTx({ msgs: [...msgs, ...borrowMessage] })
 			await client.tx.broadcast(tx)
 
-			logMsgs.push(`Repaid <code>${amount.toFixed(3)} UST</code>... LTV is now at ${LTV_SAFE}%`)
+			logMsgs.push(`Repaid <code>${amount.toFixed(3)} UST</code>... LTV is now at <code>${LTV_SAFE}%</code>`)
 			log(logMsgs.join(CRLF))
 		}
 	} catch (e) {
 		log('An error occured')
-		log(JSON.stringify(e))
+		log(JSON.stringify(e.response?.data || e))
 		failure++
 
 		if (failure >= MAX_FAILURE) {
