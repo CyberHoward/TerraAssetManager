@@ -5,6 +5,8 @@ The main goal of this bot is to avoid being liquidated due to the price volatili
 > :warning: You will need to **use your private key** to let the bot create and sign transactions.
 > We highly recommend to **create a dedicated wallet** and **we decline all responsibility if you lose any money**.
 
+<br />
+
 ## How it Works?
 
 The bot will fetch your current LTV every X seconds (10 per default).
@@ -20,6 +22,8 @@ If your LTV is higher than `LTV_LIMIT` (43% per default), the bot will try to re
 
 If your LTV is lower than `LTV_BORROW` (30% per default), the bot will borrow more and bump the TVL to `LTV_SAFE` (35% per default)` and deposit the amount borrowed.
 
+<br />
+
 ## Installation
 
 To run this bot, you will need to have `Node.js` installed on your system. We highly recommend you to use [`volta.sh`](https://volta.sh/) or [`nvm`](https://github.com/nvm-sh/nvm) to manage your `Node.js` version.
@@ -34,6 +38,8 @@ Once you have `node` and `npm` accessible in your terminal's path, you will need
 4. Run the bot with `npm run start`.
 
 > :information_source: To run the bot in a background process, we recommend using to tool [`pm2`](https://github.com/Unitech/pm2).
+
+<br />
 
 ## Setup Telegram Notification
 
