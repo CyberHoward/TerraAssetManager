@@ -1,3 +1,4 @@
+import dedent from 'dedent-js'
 import Decimal from 'decimal.js'
 import { Denom, LCDClient, MnemonicKey, Msg, Wallet } from '@terra-money/terra.js'
 import { AddressProviderFromJson, Anchor, columbus4, MARKET_DENOMS, tequila0004 } from '@anchor-protocol/anchor.js'
@@ -37,6 +38,23 @@ export class Bot {
 			address: this.#wallet.key.accAddress,
 			market: Denom.USD,
 		}
+
+		Logger.log(dedent`<b>v0.1 - Anchor Borrow / Repay Bot</b>
+				Made by Romain Lanz
+				
+				<b>Network:</b> <code>${this.#config.chainId === 'columbus-4' ? 'Mainnet' : 'Testnet'}</code>
+				<b>Address:</b>
+				<a href="https://finder.terra.money/${this.#config.chainId}/address/${this.#wallet.key.accAddress}">
+					${this.#wallet.key.accAddress}
+				</a>
+				
+				<u>Configuration:</u>
+					- <b>SAFE:</b> <code>${this.#config.ltv.safe}%</code>
+					- <b>LIMIT:</b> <code>${this.#config.ltv.limit}%</code>
+					- <b>BORROW:</b> <code>${this.#config.ltv.borrow}%</code>
+					- <b>SHOULD_BORROW_MORE:</b> <code>${this.#config.options.shouldBorrowMore}</code>
+					- <b>MAX_FAILURE:</b> <code>${this.#config.options.maxFailure}</code>
+		`)
 	}
 
 	async execute() {

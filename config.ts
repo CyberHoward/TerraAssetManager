@@ -15,6 +15,7 @@ export default {
 	options: {
 		// This define if the bot should borrow more
 		shouldBorrowMore: true,
+
 		// This define if the bot should use your reward to borrow more
 		shouldCompoundsRewards: true,
 
@@ -28,13 +29,16 @@ export default {
 	ltv: {
 		// This define the limit when the bot will repay your debt.
 		limit: 43,
+
 		// This define the safe-limit that the bot will reach when repaying or borrowing more.
 		safe: 35,
+
 		// This define the low-limit when the bot will borrow more.
 		borrow: 30,
 	},
 
 	notification: {
 		tty: true,
+		telegram: true,
 	},
 }
