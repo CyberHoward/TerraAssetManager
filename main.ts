@@ -8,12 +8,14 @@ const bot = new Bot(config)
 if (config.telegram.apiKey) {
 	const tgBot = new Telegraf(config.telegram.apiKey)
 
+	tgBot.command('ping', (ctx) => ctx.reply('Pong!'))
+
 	tgBot.command('ltv', async (ctx) => {
 		const ltv = await bot.computeLTV()
 		ctx.reply(`Your LTV is ${ltv.toFixed(3)}%`)
 	})
 
-	tgBot.command('set', async (ctx) => {
+	tgBot.command('set', (ctx) => {
 		const [, path, value] = ctx.message.text.split(' ')
 		bot.set(path, value)
 		ctx.reply(`Configuration changed. ${path} is now at ${value}`)
