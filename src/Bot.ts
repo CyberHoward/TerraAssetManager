@@ -1,15 +1,24 @@
 import { dset } from 'dset'
 import dedent from 'dedent-js'
 import Decimal from 'decimal.js'
-import { Denom, LCDClient, MnemonicKey, Msg, Wallet } from '@terra-money/terra.js'
-import { AddressProviderFromJson, Anchor, columbus4, MARKET_DENOMS, tequila0004 } from '@anchor-protocol/anchor.js'
+import { Coin, Denom, LCDClient, MnemonicKey, Msg, MsgExecuteContract, MsgSwap, Wallet } from '@terra-money/terra.js'
+import {
+	AddressProviderFromJson,
+	Anchor,
+	COLLATERAL_DENOMS,
+	columbus4,
+	MARKET_DENOMS,
+	tequila0004,
+} from '@anchor-protocol/anchor.js'
 import { Logger } from './Logger'
 
 const MICRO_MULTIPLIER = 1_000_000
+const BLUNA_TOKEN_ADDRESS = process.env.BLUNA_TOKEN_ADDRESS as string
 
 // TODO: See if we can make it dynamic
 type Channels = { main: Msg[]; tgBot: Msg[] }
 type ChannelName = keyof Channels
+
 export class Bot {
 	#running = false
 	#walletDenom: any
@@ -19,6 +28,7 @@ export class Bot {
 	#anchor: Anchor
 	#wallet: Wallet
 	#txChannels: Channels = { main: [], tgBot: [] }
+	#addressProvider: AddressProviderFromJson
 
 	constructor(config: any) {
 		this.#config = config
@@ -32,8 +42,8 @@ export class Bot {
 
 		// Initialization of the Anchor Client
 		const provider = this.#config.chainId === 'columbus-4' ? columbus4 : tequila0004
-		const addressProvider = new AddressProviderFromJson(provider)
-		this.#anchor = new Anchor(this.#client, addressProvider)
+		this.#addressProvider = new AddressProviderFromJson(provider)
+		this.#anchor = new Anchor(this.#client, this.#addressProvider)
 
 		// Initialization of the user Wallet
 		const key = new MnemonicKey({ mnemonic: this.#config.privateKey })
@@ -165,6 +175,79 @@ export class Bot {
 		this.#running = false
 	}
 
+	// TODO: Need to do some debugging and refactoring once it works
+	async compound() {
+		this.#running = true
+
+		Logger.log('Starting to compound...')
+
+		await this.executeClaimRewards()
+
+		const ancBalance = await this.getANCBalance()
+		const ancPrice = await this.getANCPrice()
+
+		Logger.toBroadcast(`ANC Balance ${ancBalance.toFixed(0)} @ ${ancPrice.toFixed(3)} UST`, 'tgBot')
+
+		try {
+			if (+ancBalance > 5) {
+				await this.#anchor.anchorToken
+					.sellANC(ancBalance.minus(1).toFixed(0))
+					.execute(this.#wallet, { gasPrices: '0.15uusd' })
+
+				const msg = new MsgSwap(
+					this.#wallet.key.accAddress,
+					new Coin(Denom.USD, ancBalance.times(ancPrice).times(MICRO_MULTIPLIER).toFixed(0)),
+					Denom.LUNA
+				)
+
+				const tx = await this.#wallet.createAndSignTx({ msgs: [msg] })
+				await this.#client.tx.broadcast(tx)
+
+				Logger.toBroadcast(`Swapped ${ancBalance.times(ancPrice).toFixed(0)} UST for Luna`, 'tgBot')
+			}
+
+			const lunaBalance = await this.getLunaBalance()
+			Logger.toBroadcast(`Luna Balance ${lunaBalance.toFixed(0)}`, 'tgBot')
+
+			if (+lunaBalance > 5) {
+				const msg = new MsgExecuteContract(
+					this.#wallet.key.accAddress,
+					'terra1fflas6wv4snv8lsda9knvq2w0cyt493r8puh2e',
+					{
+						bond: { validator: 'terravaloper1krj7amhhagjnyg2tkkuh6l0550y733jnjnnlzy' },
+					},
+					{ uluna: lunaBalance.times(MICRO_MULTIPLIER).toFixed(0) }
+				)
+
+				const tx = await this.#wallet.createAndSignTx({ msgs: [msg] })
+				await this.#client.tx.broadcast(tx)
+			}
+
+			const { balance } = await this.#client.wasm.contractQuery<any>(this.#addressProvider.bLunaToken(), {
+				balance: { address: this.#wallet.key.accAddress },
+			})
+
+			const bLunaBalance = new Decimal(balance).dividedBy(MICRO_MULTIPLIER)
+
+			if (+bLunaBalance > 5) {
+				await this.#anchor.borrow
+					.provideCollateral({
+						amount: bLunaBalance.minus(1).toFixed(0),
+						collateral: COLLATERAL_DENOMS.UBLUNA,
+						market: MARKET_DENOMS.UUSD,
+					})
+					.execute(this.#wallet, { gasPrices: '0.15uusd' })
+			}
+
+			Logger.toBroadcast(`Compouded... ${ancBalance.toFixed(3)} ANC => ${bLunaBalance.toFixed(3)} bLuna`, 'tgBot')
+		} catch (e) {
+			console.log(e.response.data)
+		}
+
+		Logger.broadcast('tgBot')
+		this.#running = false
+	}
+
 	clearCache() {
 		this.#cache.clear()
 	}
@@ -178,6 +261,17 @@ export class Bot {
 		}
 
 		return ustCoin.amount.dividedBy(MICRO_MULTIPLIER)
+	}
+
+	async getLunaBalance(): Promise<Decimal> {
+		const coins = await this.#client.bank.balance(this.#wallet.key.accAddress)
+		const lunaCoin = coins.get(Denom.LUNA)
+
+		if (!lunaCoin) {
+			return new Decimal(0)
+		}
+
+		return lunaCoin.amount.dividedBy(MICRO_MULTIPLIER)
 	}
 
 	async computeLTV() {

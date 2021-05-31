@@ -10,6 +10,10 @@ if (config.telegram.apiKey) {
 
 	tgBot.command('ping', (ctx) => ctx.reply('Pong!'))
 
+	tgBot.command('compound', () => {
+		bot.compound()
+	})
+
 	tgBot.command('ltv', async (ctx) => {
 		const ltv = await bot.computeLTV()
 		ctx.reply(`Your LTV is ${ltv.toFixed(3)}%`)
