@@ -1,7 +1,11 @@
 import got from 'got'
 import config from '../config'
+
+// TODO: See if we can make it dynamic
+type Channels = { main: string[]; tgBot: string[] }
+type ChannelName = keyof Channels
 export class Logger {
-	static messages: string[] = []
+	static channels: Channels = { main: [], tgBot: [] }
 
 	static log(message: string) {
 		if (config.notification.tty) {
@@ -29,13 +33,13 @@ export class Logger {
 			.catch()
 	}
 
-	static toBroadcast(message: string) {
-		Logger.messages.push(message)
+	static toBroadcast(message: string, channelName: ChannelName) {
+		Logger.channels[channelName].push(message)
 	}
 
-	static broadcast() {
-		const messageToSend = Logger.messages.join('\n')
+	static broadcast(channelName: ChannelName) {
+		const messageToSend = Logger.channels[channelName].join('\n')
 		Logger.log(messageToSend)
-		Logger.messages = []
+		Logger.channels[channelName] = []
 	}
 }

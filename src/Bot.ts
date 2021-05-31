@@ -1,3 +1,4 @@
+import { dset } from 'dset'
 import dedent from 'dedent-js'
 import Decimal from 'decimal.js'
 import { Denom, LCDClient, MnemonicKey, Msg, Wallet } from '@terra-money/terra.js'
@@ -6,14 +7,18 @@ import { Logger } from './Logger'
 
 const MICRO_MULTIPLIER = 1_000_000
 
+// TODO: See if we can make it dynamic
+type Channels = { main: Msg[]; tgBot: Msg[] }
+type ChannelName = keyof Channels
 export class Bot {
+	#running = false
 	#walletDenom: any
 	#config: Record<string, any>
 	#cache: Map<string, Decimal> = new Map()
 	#client: LCDClient
 	#anchor: Anchor
 	#wallet: Wallet
-	#txMessages: Msg[] = []
+	#txChannels: Channels = { main: [], tgBot: [] }
 
 	constructor(config: any) {
 		this.#config = config
@@ -57,39 +62,66 @@ export class Bot {
 		`)
 	}
 
-	async execute() {
+	set(path: string, value: string) {
+		dset(this.#config, path, value)
+	}
+
+	async execute(goTo?: number, channelName: ChannelName = 'main') {
+		if (this.#running) {
+			if (channelName === 'tgBot') {
+				Logger.log('Already running, please retry later.')
+			}
+
+			return
+		}
+
+		if (goTo) {
+			if (goTo >= this.#config.ltv.limit) {
+				Logger.log(`You cannot try to go over ${this.#config.ltv.limit}%`)
+				return
+			}
+
+			if (goTo <= this.#config.ltv.borrow) {
+				Logger.log(`You cannot try to go under ${this.#config.ltv.borrow}%`)
+				return
+			}
+		}
+
+		this.#running = true
 		const ltv = await this.computeLTV()
 
-		if (this.#config.options.shouldBorrowMore && +ltv.toFixed(3) < this.#config.ltv.borrow) {
+		if (this.#config.options.shouldBorrowMore && +ltv.toFixed(3) < (goTo || this.#config.ltv.borrow)) {
 			Logger.log(`LTV is at <code>${ltv.toFixed(3)}%</code>... borrowing...`)
 
-			const amountToBorrow = await this.computeAmountToBorrow()
-			this.toBroadcast(this.computeBorrowMessage(amountToBorrow))
-			this.toBroadcast(this.computeDepositMessage(amountToBorrow))
-			await this.broadcast()
+			const amountToBorrow = await this.computeAmountToBorrow(goTo)
+			this.toBroadcast(this.computeBorrowMessage(amountToBorrow), channelName)
+			this.toBroadcast(this.computeDepositMessage(amountToBorrow), channelName)
+			await this.broadcast(channelName)
 
 			Logger.log(
-				`Borrowed & Deposited <code>${amountToBorrow.toFixed(3)} UST</code>... LTV is now at ${this.#config.ltv.safe}%`
+				`Borrowed & Deposited <code>${amountToBorrow.toFixed(3)} UST</code>... LTV is now at <code>${
+					goTo || this.#config.ltv.safe
+				}%</code>`
 			)
 		}
 
-		if (+ltv.toFixed(3) > this.#config.ltv.limit) {
+		if (+ltv.toFixed(3) > (goTo || this.#config.ltv.limit)) {
 			Logger.log(`LTV is at <code>${ltv.toFixed(3)}%</code>... repaying...`)
 
-			const amountToRepay = await this.computeAmountToRepay()
+			const amountToRepay = await this.computeAmountToRepay(goTo)
 			const walletBalance = await this.getUSTBalance()
 
 			if (+walletBalance.minus(10) < +amountToRepay) {
-				Logger.toBroadcast('Insufficient liquidity in your wallet... withdrawing...')
+				Logger.toBroadcast('Insufficient liquidity in your wallet... withdrawing...', channelName)
 
 				const amountToWithdraw = amountToRepay.minus(walletBalance).plus(7)
 				const depositAmount = await this.getDeposit()
 
 				if (+depositAmount > +amountToWithdraw) {
-					this.toBroadcast(this.computeWithdrawMessage(amountToWithdraw))
-					Logger.toBroadcast(`Withdrawed <code>${amountToWithdraw.toFixed(3)} UST</code>...`)
+					this.toBroadcast(this.computeWithdrawMessage(amountToWithdraw), channelName)
+					Logger.toBroadcast(`Withdrawed <code>${amountToWithdraw.toFixed(3)} UST</code>...`, channelName)
 				} else {
-					Logger.toBroadcast('Insufficient deposit... trying to claim...')
+					Logger.toBroadcast('Insufficient deposit... trying to claim...', channelName)
 					await this.executeClaimRewards()
 
 					const ancBalance = await this.getANCBalance()
@@ -97,31 +129,40 @@ export class Bot {
 
 					if (+ancPrice.times(ancBalance) > +amountToRepay) {
 						const quantityToSell = amountToRepay.dividedBy(ancPrice)
-						this.toBroadcast(this.computeSellANCMessage(quantityToSell))
+						this.toBroadcast(this.computeSellANCMessage(quantityToSell), channelName)
 						Logger.toBroadcast(
-							`Sold <code>${quantityToSell.toFixed(3)} ANC</code> at <code>${ancPrice.toFixed(3)} UST</code> per ANC...`
+							`Sold <code>${quantityToSell.toFixed(3)} ANC</code> at <code>${ancPrice.toFixed(
+								3
+							)} UST</code> per ANC...`,
+							channelName
 						)
 
 						const toStake = ancBalance.minus(quantityToSell)
-						this.toBroadcast(this.computeStakeANCMessage(toStake))
-						Logger.toBroadcast(`Staked <code>${toStake.toFixed(3)} ANC</code>...`)
+						this.toBroadcast(this.computeStakeANCMessage(toStake), channelName)
+						Logger.toBroadcast(`Staked <code>${toStake.toFixed(3)} ANC</code>...`, channelName)
 					} else {
-						Logger.toBroadcast(`Impossible to repay <code>${amountToRepay.toFixed(3)} UST</code>`)
-						Logger.broadcast()
-						this.#txMessages = []
+						Logger.toBroadcast(`Impossible to repay <code>${amountToRepay.toFixed(3)} UST</code>`, channelName)
+						Logger.broadcast(channelName)
+						this.#txChannels['main'] = []
+						this.#running = false
 						return
 					}
 				}
 			}
 
-			this.toBroadcast(this.computeRepayMessage(amountToRepay))
-			await this.broadcast()
+			this.toBroadcast(this.computeRepayMessage(amountToRepay), channelName)
+			await this.broadcast(channelName)
 
 			Logger.toBroadcast(
-				`Repaid <code>${amountToRepay.toFixed(3)} UST</code>... LTV is now at <code>${this.#config.ltv.safe}%</code>`
+				`Repaid <code>${amountToRepay.toFixed(3)} UST</code>... LTV is now at <code>${
+					goTo || this.#config.ltv.safe
+				}%</code>`,
+				channelName
 			)
-			Logger.broadcast()
+			Logger.broadcast(channelName)
 		}
+
+		this.#running = false
 	}
 
 	clearCache() {
@@ -146,10 +187,10 @@ export class Bot {
 		return borrowedValue.dividedBy(borrowLimit.times(2)).times(100)
 	}
 
-	async computeAmountToRepay(safe = this.#config.ltv.safe) {
+	async computeAmountToRepay(target = this.#config.ltv.safe) {
 		const borrowedValue = await this.getBorrowedValue()
 		const borrowLimit = await this.getBorrowLimit()
-		const amountForSafeZone = new Decimal(safe).times(borrowLimit.times(2).dividedBy(100))
+		const amountForSafeZone = new Decimal(target).times(borrowLimit.times(2).dividedBy(100))
 
 		return borrowedValue.minus(amountForSafeZone)
 	}
@@ -217,18 +258,24 @@ export class Bot {
 		return this.#anchor.anchorToken.claimUSTBorrowRewards({ market: MARKET_DENOMS.UUSD }).execute(this.#wallet, {})
 	}
 
-	private toBroadcast(message: Msg | Msg[]) {
+	private toBroadcast(message: Msg | Msg[], channelName: ChannelName) {
 		if (Array.isArray(message)) {
-			this.#txMessages.push(...message)
+			this.#txChannels[channelName].push(...message)
 			return
 		}
-		this.#txMessages.push(message)
+
+		this.#txChannels[channelName].push(message)
 	}
 
-	private async broadcast() {
-		const tx = await this.#wallet.createAndSignTx({ msgs: this.#txMessages })
-		await this.#client.tx.broadcast(tx)
-		this.#txMessages = []
+	private async broadcast(channelName: ChannelName) {
+		try {
+			const tx = await this.#wallet.createAndSignTx({ msgs: this.#txChannels[channelName] })
+			await this.#client.tx.broadcast(tx)
+		} catch (e) {
+			Logger.log(`An error occured\n${e.response.data}`)
+		} finally {
+			this.#txChannels[channelName] = []
+		}
 	}
 
 	private async cache(key: string, callback: () => Promise<string>) {
