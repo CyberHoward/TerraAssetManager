@@ -13,7 +13,6 @@ import {
 import { Logger } from './Logger'
 
 const MICRO_MULTIPLIER = 1_000_000
-const BLUNA_TOKEN_ADDRESS = process.env.BLUNA_TOKEN_ADDRESS as string
 
 // TODO: See if we can make it dynamic
 type Channels = { main: Msg[]; tgBot: Msg[] }
