@@ -360,6 +360,10 @@ export class Bot {
 		this.#txChannels[channelName].push(message)
 	}
 
+	clearQueue(channelName: ChannelName) {
+		this.#txChannels[channelName] = []
+	}
+
 	private async broadcast(channelName: ChannelName) {
 		try {
 			const tx = await this.#wallet.createAndSignTx({ msgs: this.#txChannels[channelName] })

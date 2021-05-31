@@ -33,6 +33,10 @@ export class Logger {
 			.catch()
 	}
 
+	static clearChannel(channelName: ChannelName) {
+		Logger.channels[channelName] = []
+	}
+
 	static toBroadcast(message: string, channelName: ChannelName) {
 		Logger.channels[channelName].push(message)
 	}

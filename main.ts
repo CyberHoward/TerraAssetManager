@@ -2,6 +2,7 @@ require('dotenv').config()
 import { Telegraf } from 'telegraf'
 import config from './config'
 import { Bot } from './src/Bot'
+import { Logger } from './src/Logger'
 
 const bot = new Bot(config)
 
@@ -39,8 +40,16 @@ if (config.telegram.apiKey) {
 }
 
 async function main() {
-	await bot.execute()
-	bot.clearCache()
+	try {
+		await bot.execute()
+	} catch (e) {
+		Logger.log(`An error occured\n${e.response.data}`)
+		bot.clearQueue('main')
+		Logger.clearChannel('main')
+	} finally {
+		bot.clearCache()
+	}
+
 	setTimeout(main, config.options.waitFor * 1000)
 }
 
