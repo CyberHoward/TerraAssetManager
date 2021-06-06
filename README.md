@@ -11,7 +11,7 @@ The main goal of this bot is to avoid being liquidated due to the price volatili
 
 The bot will fetch your current LTV every X seconds (10 per default).
 
-If your LTV is higher than `LTV_LIMIT` (43% per default), the bot will try to repay the sum needed to make your LTV back at `LTV_SAFE` (35% per default).
+If your LTV is higher than `ltv.limit` (43% per default), the bot will try to repay the sum needed to make your LTV back at `ltv.safe` (35% per default).
 
 1. We verify the balance of your wallet to see if you have enough money to repay;
 2. We verify the balance of your deposit to see if you can withdraw from it to repay;
@@ -20,7 +20,7 @@ If your LTV is higher than `LTV_LIMIT` (43% per default), the bot will try to re
 
 > :information_source: If we need to claim any rewards, we will sell only the required amount and stake in governance the rest of your token.
 
-If your LTV is lower than `LTV_BORROW` (30% per default), the bot will borrow more to reach the `LTV_SAFE` (35% per default), then it will deposit the amount borrowed.
+If your LTV is lower than `ltv.borrow` (30% per default), the bot will borrow more to reach the `ltv.safe` (35% per default), then it will deposit the amount borrowed.
 
 <br />
 
@@ -29,7 +29,7 @@ If your LTV is lower than `LTV_BORROW` (30% per default), the bot will borrow mo
 You will need to have `Node.js` installed on your system to run this bot.
 We highly recommend you to use [`volta.sh`](https://volta.sh/) or [`nvm`](https://github.com/nvm-sh/nvm) to manage your `Node.js` version.
 
-> :information_source: The bot has been tested with Node.js 16.2.0.
+> :information_source: The bot has been tested with Node.js 16.2.0, on Windows, Linux & macOS.
 
 Once you have `node` and `npm` accessible in your terminal's path, you will need to do the following:
 
