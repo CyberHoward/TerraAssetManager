@@ -20,7 +20,7 @@ If your LTV is higher than `LTV_LIMIT` (43% per default), the bot will try to re
 
 > :information_source: If we need to claim any rewards, we will sell only the required amount and stake in governance the rest of your token.
 
-If your LTV is lower than `LTV_BORROW` (30% per default), the bot will borrow more to reach the `LTV_SAFE` (35% per default)`, then it will deposit the amount borrowed.
+If your LTV is lower than `LTV_BORROW` (30% per default), the bot will borrow more to reach the `LTV_SAFE` (35% per default), then it will deposit the amount borrowed.
 
 <br />
 
