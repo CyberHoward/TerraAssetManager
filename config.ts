@@ -20,7 +20,7 @@ export default {
 		shouldCompoundsRewards: true,
 
 		// This define the number of SECONDS to wait between each verification.
-		waitFor: 10,
+		waitFor: 15,
 
 		// This define the number of uncaught issue the bot can have before shutting down, 0 = unlimited
 		maxFailure: 3,
