@@ -36,6 +36,10 @@ if (config.telegram.apiKey) {
 		await bot.execute(+amount, 'tgBot')
 	})
 
+	tgBot.catch((e) => {
+		console.log(e)
+	})
+
 	tgBot.launch()
 }
 
