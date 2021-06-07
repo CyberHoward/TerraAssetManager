@@ -47,7 +47,12 @@ async function main() {
 	try {
 		await bot.execute()
 	} catch (e) {
-		Logger.log(`An error occured\n${e.response.data}`)
+		if (e.response) {
+			Logger.log(`An error occured\n${e.response?.data}`)
+		} else {
+			Logger.log(`An error occured\n${e}`)
+		}
+		
 		bot.clearQueue('main')
 		Logger.clearChannel('main')
 	} finally {
