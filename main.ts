@@ -37,8 +37,10 @@ if (config.telegram.apiKey) {
 	})
 
 	tgBot.catch((e) => {
+		// @ts-expect-error Typing
 		if (e.response) {
-			console.error('[Logger TG Bot]', e.response?.data)	
+			// @ts-expect-error Typing
+			console.error('[Logger TG Bot]', e.response?.data)
 		} else {
 			console.error('[Logger TG Bot]', e)
 		}
