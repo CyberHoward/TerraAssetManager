@@ -37,7 +37,11 @@ if (config.telegram.apiKey) {
 	})
 
 	tgBot.catch((e) => {
-		console.log(e)
+		if (e.response) {
+			console.error('[Logger TG Bot]', e.response?.data)	
+		} else {
+			console.error('[Logger TG Bot]', e)
+		}
 	})
 
 	tgBot.launch()
@@ -52,7 +56,7 @@ async function main() {
 		} else {
 			Logger.log(`An error occured\n${e}`)
 		}
-		
+
 		bot.clearQueue('main')
 		Logger.clearChannel('main')
 	} finally {
