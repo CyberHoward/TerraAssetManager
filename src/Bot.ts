@@ -53,7 +53,7 @@ export class Bot {
 			market: Denom.USD,
 		}
 
-		Logger.log(dedent`<b>v0.2.4 - Anchor Borrow / Repay Bot</b>
+		Logger.log(dedent`<b>v0.2.5 - Anchor Borrow / Repay Bot</b>
 				Made by Romain Lanz
 				
 				<b>Network:</b> <code>${this.#config.chainId === 'columbus-4' ? 'Mainnet' : 'Testnet'}</code>
