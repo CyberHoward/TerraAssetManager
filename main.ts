@@ -62,6 +62,7 @@ async function main() {
 		bot.clearQueue('main')
 		Logger.clearChannel('main')
 	} finally {
+		bot.stopExecution()
 		bot.clearCache()
 	}
 

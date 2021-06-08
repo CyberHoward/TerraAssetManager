@@ -247,6 +247,10 @@ export class Bot {
 		this.#running = false
 	}
 
+	stopExecution() {
+		this.#running = false
+	}
+
 	clearCache() {
 		this.#cache.clear()
 	}
