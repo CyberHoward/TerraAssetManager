@@ -4,7 +4,8 @@
 	"author": "Romain Lanz <romain.lanz@pm.me>",
 	"license": "MIT",
 	"scripts": {
-		"start": "ts-node main.ts"
+		"start": "ts-node --transpile-only main.ts",
+		"dev": "ts-node main.ts"
 	},
 	"homepage": "https://github.com/RomainLanz/anchor-repay#readme",
 	"dependencies": {
