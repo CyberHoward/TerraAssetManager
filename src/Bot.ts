@@ -66,8 +66,6 @@ export class Bot {
 					- <b>SAFE:</b> <code>${this.#config.ltv.safe}%</code>
 					- <b>LIMIT:</b> <code>${this.#config.ltv.limit}%</code>
 					- <b>BORROW:</b> <code>${this.#config.ltv.borrow}%</code>
-					- <b>SHOULD_BORROW_MORE:</b> <code>${this.#config.options.shouldBorrowMore}</code>
-					- <b>MAX_FAILURE:</b> <code>${this.#config.options.maxFailure}</code>
 		`)
 	}
 
