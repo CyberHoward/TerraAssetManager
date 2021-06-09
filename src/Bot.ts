@@ -70,7 +70,15 @@ export class Bot {
 	}
 
 	set(path: string, value: string) {
+		if (path === 'ltv.limit') {
+			if (+value > 49) {
+				Logger.log('You cannot go over <code>49</code>.')
+				return
+			}
+		}
+
 		dset(this.#config, path, value)
+		Logger.log(`Configuration changed. <code>${path}</code> is now at <code>${value}</code>`)
 	}
 
 	async execute(goTo?: number, channelName: ChannelName = 'main') {

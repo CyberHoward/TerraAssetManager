@@ -30,7 +30,6 @@ if (config.telegram.apiKey) {
 	tgBot.command('set', (ctx) => {
 		const [, path, value] = ctx.message.text.split(' ')
 		bot.set(path, value)
-		ctx.replyWithHTML(`Configuration changed. <code>${path}</code> is now at <code>${value}</code>`)
 	})
 
 	tgBot.command('goto', async (ctx) => {
