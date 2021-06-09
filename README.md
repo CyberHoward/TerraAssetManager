@@ -65,8 +65,6 @@ You will also be able to control the bot via some commands.
 If you would like to try the bot before running in production, you may want to use the Terra Testnet.
 You can add fake money to your Testnet Wallet using https://faucet.terra.money/.
 
-We also provide a dry-run option to not execute any transactions and only notify you ([#6](https://github.com/RomainLanz/anchor-borrow-bot/issues/6)).
-
 ## Tips
 
 If you want to send any tips, you can send them to `terra17lkkhegetxqua7s7g7k3xr9hxzcpvf8p878cnl`.
