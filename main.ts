@@ -1,4 +1,5 @@
 require('dotenv').config()
+import dedent from 'dedent-js'
 import { Telegraf } from 'telegraf'
 import config from './config'
 import { Bot } from './src/Bot'
@@ -10,6 +11,25 @@ if (config.telegram.apiKey) {
 	const tgBot = new Telegraf(config.telegram.apiKey)
 
 	tgBot.command('ping', (ctx) => ctx.reply('Pong!'))
+
+	tgBot.command('info', (ctx) => {
+		const { config, wallet } = bot.getContext()
+
+		ctx.replyWithHTML(dedent`<b>v0.2.5 - Anchor Borrow / Repay Bot</b>
+			Made by Romain Lanz
+			
+			<b>Network:</b> <code>${config.chainId === 'columbus-4' ? 'Mainnet' : 'Testnet'}</code>
+			<b>Address:</b>
+			<a href="https://finder.terra.money/${config.chainId}/address/${wallet}">
+				${wallet}
+			</a>
+			
+			<u>Configuration:</u>
+				- <b>SAFE:</b> <code>${config.ltv.safe}%</code>
+				- <b>LIMIT:</b> <code>${config.ltv.limit}%</code>
+				- <b>BORROW:</b> <code>${config.ltv.borrow}%</code>
+		`)
+	})
 
 	tgBot.command('compound', () => {
 		bot.compound()

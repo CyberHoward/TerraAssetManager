@@ -258,6 +258,10 @@ export class Bot {
 		this.#running = false
 	}
 
+	getContext() {
+		return { config: this.#config, wallet: this.#wallet.key.accAddress }
+	}
+
 	stopExecution() {
 		this.#running = false
 	}
