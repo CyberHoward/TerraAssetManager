@@ -16,14 +16,21 @@ if (config.telegram.apiKey) {
 	// })
 
 	tgBot.command('ltv', async (ctx) => {
+		const message = await ctx.replyWithHTML('Loading...')
 		const ltv = await bot.computeLTV()
-		ctx.reply(`Your LTV is ${ltv.toFixed(3)}%`)
+		ctx.telegram.editMessageText(
+			message.chat.id,
+			message.message_id,
+			undefined,
+			`Your LTV is <code>${ltv.toFixed(3)}%</code>`,
+			{ parse_mode: 'HTML' }
+		)
 	})
 
 	tgBot.command('set', (ctx) => {
 		const [, path, value] = ctx.message.text.split(' ')
 		bot.set(path, value)
-		ctx.reply(`Configuration changed. ${path} is now at ${value}`)
+		ctx.replyWithHTML(`Configuration changed. <code>${path}</code> is now at <code>${value}</code>`)
 	})
 
 	tgBot.command('goto', async (ctx) => {
@@ -31,8 +38,10 @@ if (config.telegram.apiKey) {
 
 		if (!Number.isInteger(+amount)) {
 			ctx.reply('Send a correct number')
+			return
 		}
 
+		ctx.replyWithHTML(`Going to <code>${amount}%</code>`)
 		await bot.execute(+amount, 'tgBot')
 	})
 
