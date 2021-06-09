@@ -45,7 +45,7 @@ export class Bot {
 		this.#anchor = new Anchor(this.#client, this.#addressProvider)
 
 		// Initialization of the user Wallet
-		const key = new MnemonicKey({ mnemonic: this.#config.privateKey })
+		const key = new MnemonicKey({ mnemonic: this.#config.mnemonic })
 		this.#wallet = new Wallet(this.#client, key)
 
 		this.#walletDenom = {

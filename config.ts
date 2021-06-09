@@ -1,6 +1,6 @@
 export default {
 	// This should be your wallet private key
-	privateKey: process.env.KEY || '',
+	mnemonic: process.env.KEY || '',
 
 	// This is Terra Blockchain information
 	lcdUrl: process.env.LCD_URL,
