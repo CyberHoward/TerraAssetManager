@@ -11,9 +11,9 @@ if (config.telegram.apiKey) {
 
 	tgBot.command('ping', (ctx) => ctx.reply('Pong!'))
 
-	// tgBot.command('compound', () => {
-	// 	bot.compound()
-	// })
+	tgBot.command('compound', () => {
+		bot.compound()
+	})
 
 	tgBot.command('ltv', async (ctx) => {
 		const message = await ctx.replyWithHTML('Loading...')

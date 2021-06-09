@@ -180,7 +180,6 @@ export class Bot {
 		this.#running = false
 	}
 
-	// TODO: Need to do some debugging and refactoring once it works
 	async compound() {
 		this.#running = true
 
@@ -191,7 +190,10 @@ export class Bot {
 		const ancBalance = await this.getANCBalance()
 		const ancPrice = await this.getANCPrice()
 
-		Logger.toBroadcast(`ANC Balance ${ancBalance.toFixed(0)} @ ${ancPrice.toFixed(3)} UST`, 'tgBot')
+		Logger.toBroadcast(
+			`Selling <code>${ancBalance.toFixed(0)} ANC</code> @ <code>${ancPrice.toFixed(3)} UST</code>`,
+			'tgBot'
+		)
 
 		try {
 			if (+ancBalance > 5) {
@@ -208,18 +210,18 @@ export class Bot {
 				const tx = await this.#wallet.createAndSignTx({ msgs: [msg] })
 				await this.#client.tx.broadcast(tx)
 
-				Logger.toBroadcast(`Swapped ${ancBalance.times(ancPrice).toFixed(0)} UST for Luna`, 'tgBot')
+				Logger.toBroadcast(`Swapped <code>${ancBalance.times(ancPrice).toFixed(0)} UST</code>`, 'tgBot')
 			}
 
 			const lunaBalance = await this.getLunaBalance()
-			Logger.toBroadcast(`Luna Balance ${lunaBalance.toFixed(0)}`, 'tgBot')
+			Logger.toBroadcast(`New Luna Balance is <code>${lunaBalance.toFixed(0)}</code>`, 'tgBot')
 
 			if (+lunaBalance > 5) {
 				const msg = new MsgExecuteContract(
 					this.#wallet.key.accAddress,
-					'terra1fflas6wv4snv8lsda9knvq2w0cyt493r8puh2e',
+					this.#addressProvider.bLunaHub(),
 					{
-						bond: { validator: 'terravaloper1krj7amhhagjnyg2tkkuh6l0550y733jnjnnlzy' },
+						bond: { validator: process.env.VALIDATOR_ADDRESS },
 					},
 					{ uluna: lunaBalance.times(MICRO_MULTIPLIER).toFixed(0) }
 				)
@@ -244,7 +246,10 @@ export class Bot {
 					.execute(this.#wallet, { gasPrices: '0.15uusd' })
 			}
 
-			Logger.toBroadcast(`Compouded... ${ancBalance.toFixed(3)} ANC => ${bLunaBalance.toFixed(3)} bLuna`, 'tgBot')
+			Logger.toBroadcast(
+				`Compounded... <code>${ancBalance.toFixed(3)} ANC</code> for <code>${bLunaBalance.toFixed(3)} bLuna</code>`,
+				'tgBot'
+			)
 		} catch (e) {
 			console.log(e.response.data)
 		}
