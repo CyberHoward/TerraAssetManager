@@ -40,9 +40,9 @@ if (config.telegram.apiKey) {
 		// @ts-expect-error Typing
 		if (e.response) {
 			// @ts-expect-error Typing
-			console.error('[Logger TG Bot]', e.response?.data)
+			console.error('[Error Telegraf]', e.response)
 		} else {
-			console.error('[Logger TG Bot]', e)
+			console.error('[Error Telegraf]', e)
 		}
 	})
 
