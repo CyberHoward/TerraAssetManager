@@ -185,6 +185,12 @@ export class Bot {
 
 		Logger.log('Starting to compound...')
 
+		if (!process.env.VALIDATOR_ADDRESS) {
+			Logger.log('Invalid Validator Address')
+			this.#running = false
+			return
+		}
+
 		await this.executeClaimRewards()
 
 		const ancBalance = await this.getANCBalance()

@@ -97,4 +97,16 @@ async function main() {
 	setTimeout(main, config.options.waitFor * 1000)
 }
 
+if (process.env.MNEMONIC && process.env.MNEMONIC.split(' ').length !== 24) {
+	throw new Error('Invalid mnemonic key provided.')
+}
+
+if (process.env.LCD_URL && !process.env.LCD_URL.startsWith('https://')) {
+	throw new Error('Invalid LCD URL provided.')
+}
+
+if (process.env.CHAIN_ID && process.env.CHAIN_ID.split('-').length !== 2) {
+	throw new Error('Invalid CHAIN ID provided.')
+}
+
 main()
