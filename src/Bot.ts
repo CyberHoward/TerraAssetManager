@@ -77,6 +77,20 @@ export class Bot {
 			}
 		}
 
+		if (path === 'ltv.safe') {
+			if (+value >= this.#config.ltv.limit) {
+				Logger.log('You cannot go over <code>${this.#config.ltv.limit}</code>.')
+				return
+			}
+		}
+
+		if (path === 'ltv.borrow') {
+			if (+value >= this.#config.ltv.safe) {
+				Logger.log(`You cannot go over <code>${this.#config.ltv.safe}</code>.`)
+				return
+			}
+		}
+
 		dset(this.#config, path, value)
 		Logger.log(`Configuration changed. <code>${path}</code> is now at <code>${value}</code>`)
 	}
