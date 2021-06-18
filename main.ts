@@ -71,7 +71,7 @@ if (config.telegram.apiKey) {
 	tgBot.command('goto', async (ctx) => {
 		const [, amount] = ctx.message.text.split(' ')
 
-		if (!Number.isInteger(+amount)) {
+		if (isNaN(+amount)) {
 			ctx.reply('Send a correct number')
 			return
 		}
