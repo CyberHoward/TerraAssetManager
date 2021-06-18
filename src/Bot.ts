@@ -104,6 +104,9 @@ export class Bot {
 
 	pause() {
 		this.#status = 'PAUSE'
+		this.clearCache()
+		this.clearQueue('main')
+		this.clearQueue('tgBot')
 		Logger.log('Bot paused')
 	}
 
