@@ -20,7 +20,7 @@ If your LTV is higher than `ltv.limit` (43% per default), the bot will try to re
 
 > :information_source: If we need to claim any rewards, we will sell only the required amount and stake in governance the rest of your token.
 
-If your LTV is lower than `ltv.borrow` (30% per default), the bot will borrow more to reach the `ltv.safe` (35% per default), then it will deposit the amount borrowed.
+If your LTV is lower than `ltv.borrow` (30% per default) and the option is activated, the bot will borrow more to reach the `ltv.safe` (35% per default), then it will deposit the amount borrowed.
 
 <br />
 
@@ -64,6 +64,15 @@ You will also be able to control the bot via some commands.
 
 > :information_source: The `/compound` command has not been tested yet on the MAINNET, please, create an issue if you had any issue using it.
 
+### Changeable runtime settings (`/set`)
+
+| path                     | Description                                                     | Accept  |
+| ------------------------ | --------------------------------------------------------------- | ------- |
+| ltv.borrow               | At which LTV the bot should borrow more                         | Number  |
+| ltv.limit                | At which LTV the bot should repay                               | Number  |
+| ltv.safe                 | At which LTV the bot should go when borrowing or repaying       | Number  |
+| options.shouldBorrowMore | Define if the bot should borrow more when reaching `ltv.borrow` | Boolean |
+
 <br />
 
 ## Issues
@@ -71,10 +80,14 @@ You will also be able to control the bot via some commands.
 - If you have any issues with the bot, please, feel free to create one on this repository.
 - If the bot is stuck in `Already running, please retry later`, you can safely start it again by running `/pause` followed by `/run` (The bot should automatically restart if it's stuck).
 
+<br />
+
 ## Testing
 
 If you would like to try the bot before running in production, you may want to use the Terra Testnet.
 You can add fake money to your Testnet Wallet using https://faucet.terra.money/.
+
+<br />
 
 ## Tips
 

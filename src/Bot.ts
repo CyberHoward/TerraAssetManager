@@ -20,6 +20,14 @@ type ChannelName = keyof Channels
 
 type BotStatus = 'IDLE' | 'RUNNING' | 'PAUSE'
 
+function isBoolean(v) {
+	return ['true', true, '1', 1, 'false', false, '0', 0].includes(v)
+}
+
+function toBoolean(v) {
+	return ['true', true, '1', 1].includes(v)
+}
+
 export class Bot {
 	#failureCount = 0
 	#walletDenom: any
@@ -72,12 +80,14 @@ export class Bot {
 		`)
 	}
 
-	set(path: string, value: string) {
+	set(path: string, value: any) {
 		if (path === 'ltv.limit') {
 			if (+value > 49) {
 				Logger.log('You cannot go over <code>49</code>.')
 				return
 			}
+
+			value = +value
 		}
 
 		if (path === 'ltv.safe') {
@@ -85,6 +95,8 @@ export class Bot {
 				Logger.log(`You cannot go over <code>${this.#config.ltv.limit}</code>.`)
 				return
 			}
+
+			value = +value
 		}
 
 		if (path === 'ltv.borrow') {
@@ -92,6 +104,17 @@ export class Bot {
 				Logger.log(`You cannot go over <code>${this.#config.ltv.safe}</code>.`)
 				return
 			}
+
+			value = +value
+		}
+
+		if (path === 'options.shouldBorrowMore') {
+			if (!isBoolean(value)) {
+				Logger.log(`The value must be a boolean (true/false).`)
+				return
+			}
+
+			value = toBoolean(value)
 		}
 
 		dset(this.#config, path, value)
