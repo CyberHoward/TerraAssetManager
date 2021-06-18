@@ -98,6 +98,11 @@ export class Bot {
 	}
 
 	run() {
+		if (this.#status !== 'PAUSE') {
+			Logger.log('Bot should be paused to run this command')
+			return
+		}
+
 		this.#status = 'IDLE'
 		Logger.log('Bot started')
 	}
