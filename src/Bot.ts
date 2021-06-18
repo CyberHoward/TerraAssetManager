@@ -21,6 +21,7 @@ type ChannelName = keyof Channels
 type BotStatus = 'IDLE' | 'RUNNING' | 'PAUSE'
 
 export class Bot {
+	#failureCount = 0
 	#walletDenom: any
 	#config: Record<string, any>
 	#cache: Map<string, Decimal> = new Map()
@@ -109,6 +110,7 @@ export class Bot {
 
 	pause() {
 		this.#status = 'PAUSE'
+		this.#failureCount = 0
 		this.clearCache()
 		this.clearQueue('main')
 		this.clearQueue('tgBot')
@@ -186,6 +188,13 @@ export class Bot {
 				Logger.log('Already running, please retry later.')
 			}
 
+			if (this.#failureCount >= 5) {
+				Logger.log('It seems that the bot is stuck! Restarting...')
+				this.pause()
+				setTimeout(() => this.run(), 1000)
+			}
+
+			this.#failureCount++
 			return
 		}
 
@@ -259,6 +268,7 @@ export class Bot {
 						Logger.broadcast(channelName)
 						this.#txChannels['main'] = []
 						this.#status = 'IDLE'
+						this.#failureCount = 0
 						return
 					}
 				}
@@ -276,6 +286,7 @@ export class Bot {
 			Logger.broadcast(channelName)
 		}
 
+		this.#failureCount = 0
 		this.#status = 'IDLE'
 	}
 

@@ -69,7 +69,7 @@ You will also be able to control the bot via some commands.
 ## Issues
 
 - If you have any issues with the bot, please, feel free to create one on this repository.
-- If the bot is stuck in `Already running, please retry later`, you can safely start it again by running `/pause` followed by `/run`.
+- If the bot is stuck in `Already running, please retry later`, you can safely start it again by running `/pause` followed by `/run` (The bot should automatically restart if it's stuck).
 
 ## Testing
 
