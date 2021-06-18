@@ -55,10 +55,21 @@ You will also be able to control the bot via some commands.
 
 - `/ping` - Will answer you `Pong!`;
 - `/ltv` - Will give you your current LTV;
-- `/goto X` - Will repay or borrow to change your LTV according to X
-- `/set X Y` - Will change runtime configuration (ie: `/set ltv.borrow 20`)
+- `/goto X` - Will repay or borrow to change your LTV according to X;
+- `/set X Y` - Will change runtime configuration (ie: `/set ltv.borrow 20`);
+- `/run` - Start the bot if it's paused;
+- `/pause` - Pause the bot, clear all caches and queues;
+- `/info` - Display current status and config;
+- `/compound` - Compound your rewards by selling them, swapping them to UST > Luna, bonding to bLuna and providing them.
+
+> :information_source: The `/compound` command has not been tested yet on the MAINNET, please, create an issue if you had any issue using it.
 
 <br />
+
+## Issues
+
+- If you have any issues with the bot, please, feel free to create one on this repository.
+- If the bot is stuck in `Already running, please retry later`, you can safely start it again by running `/pause` followed by `/run`.
 
 ## Testing
 
