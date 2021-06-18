@@ -1,6 +1,6 @@
 export default {
-	// This should be your wallet private key
-	privateKey: process.env.KEY || '',
+	// This should be your wallet mnemonic (24 words).
+	mnemonic: process.env.MNEMONIC,
 
 	// This is Terra Blockchain information
 	lcdUrl: process.env.LCD_URL,
@@ -21,9 +21,6 @@ export default {
 
 		// This define the number of SECONDS to wait between each verification.
 		waitFor: 15,
-
-		// This define the number of uncaught issue the bot can have before shutting down, 0 = unlimited
-		maxFailure: 3,
 	},
 
 	ltv: {
