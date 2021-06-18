@@ -18,6 +18,10 @@ const MICRO_MULTIPLIER = 1_000_000
 type Channels = { main: Msg[]; tgBot: Msg[] }
 type ChannelName = keyof Channels
 
+function sleep(s: number) {
+	return new Promise((resolve) => setTimeout(resolve, s * 1000))
+}
+
 export class Bot {
 	#running = false
 	#walletDenom: any
@@ -27,6 +31,7 @@ export class Bot {
 	#anchor: Anchor
 	#wallet: Wallet
 	#txChannels: Channels = { main: [], tgBot: [] }
+	#pause = false
 	#addressProvider: AddressProviderFromJson
 
 	constructor(config: any) {
@@ -53,7 +58,7 @@ export class Bot {
 			market: Denom.USD,
 		}
 
-		Logger.log(dedent`<b>v0.2.5 - Anchor Borrow / Repay Bot</b>
+		Logger.log(dedent`<b>v0.2.6 - Anchor Borrow / Repay Bot</b>
 				Made by Romain Lanz
 				
 				<b>Network:</b> <code>${this.#config.chainId === 'columbus-4' ? 'Mainnet' : 'Testnet'}</code>
@@ -79,7 +84,7 @@ export class Bot {
 
 		if (path === 'ltv.safe') {
 			if (+value >= this.#config.ltv.limit) {
-				Logger.log('You cannot go over <code>${this.#config.ltv.limit}</code>.')
+				Logger.log(`You cannot go over <code>${this.#config.ltv.limit}</code>.`)
 				return
 			}
 		}
@@ -95,7 +100,80 @@ export class Bot {
 		Logger.log(`Configuration changed. <code>${path}</code> is now at <code>${value}</code>`)
 	}
 
+	run() {
+		this.#pause = false
+	}
+
+	pause() {
+		this.#pause = true
+	}
+
+	// async repay() {
+	// 	if (this.#pause) {
+	// 		Logger.log('Bot is paused, use <code>/run</code> to start it.')
+	// 		return
+	// 	}
+
+	// 	if (this.#running) {
+	// 		Logger.log('Already running, please retry later.')
+	// 		return
+	// 	}
+
+	// 	this.#running = true
+	// 	const ltv = await this.computeLTV()
+
+	// 	Logger.log(`LTV is at <code>${ltv.toFixed(3)}%</code>... repaying...`)
+
+	// 	const amountToRepay = await this.computeAmountToRepay(0)
+	// 	const walletBalance = await this.getUSTBalance()
+
+	// 	if (+walletBalance < +amountToRepay) {
+	// 		Logger.toBroadcast('Insufficient liquidity in your wallet... withdrawing...', 'tgBot')
+	// 		const depositAmount = await this.getDeposit()
+
+	// 		if (+depositAmount.plus(walletBalance) < +amountToRepay) {
+	// 			this.toBroadcast(this.computeWithdrawMessage(depositAmount), 'tgBot')
+	// 			Logger.toBroadcast(`Withdrawed <code>${depositAmount.toFixed(3)} UST</code>...`, 'tgBot')
+	// 		} else {
+	// 			this.toBroadcast(this.computeWithdrawMessage(amountToRepay.minus(walletBalance).plus(10)), 'tgBot')
+	// 			Logger.toBroadcast(
+	// 				`Withdrawed <code>${amountToRepay.minus(walletBalance).plus(10).toFixed(3)} UST</code>...`,
+	// 				'tgBot'
+	// 			)
+	// 		}
+	// 	}
+
+	// 	if (this.#txChannels['tgBot'].length > 0) {
+	// 		await this.broadcast('tgBot')
+	// 	}
+
+	// 	const walletBalance2 = await this.getUSTBalance()
+
+	// 	if (+walletBalance2 < +amountToRepay) {
+	// 		this.toBroadcast(this.computeRepayMessage(walletBalance2), 'tgBot')
+	// 		Logger.toBroadcast(`Repaid <code>${walletBalance2.toFixed(3)} UST</code>`, 'tgBot')
+	// 	} else {
+	// 		this.toBroadcast(this.computeRepayMessage(amountToRepay), 'tgBot')
+	// 		Logger.toBroadcast(`Repaid <code>${amountToRepay.toFixed(3)} UST</code>`, 'tgBot')
+	// 	}
+
+	// 	await sleep(10)
+	// 	await this.broadcast('tgBot')
+	// 	Logger.broadcast('tgBot')
+	// 	this.stopExecution()
+	// 	this.clearCache()
+	// 	this.clearQueue('tgBot')
+	// }
+
 	async execute(goTo?: number, channelName: ChannelName = 'main') {
+		if (this.#pause) {
+			if (channelName === 'tgBot') {
+				Logger.log('Bot is paused, use <code>/run</code> to start it.')
+			}
+
+			return
+		}
+
 		if (this.#running) {
 			if (channelName === 'tgBot') {
 				Logger.log('Already running, please retry later.')
@@ -104,13 +182,13 @@ export class Bot {
 			return
 		}
 
-		if (goTo) {
+		if (typeof goTo !== 'undefined') {
 			if (goTo >= this.#config.ltv.limit) {
 				Logger.log(`You cannot try to go over ${this.#config.ltv.limit}%`)
 				return
 			}
 
-			if (goTo <= this.#config.ltv.borrow) {
+			if (this.#config.options.shouldBorrowMore && goTo <= this.#config.ltv.borrow) {
 				Logger.log(`You cannot try to go under ${this.#config.ltv.borrow}%`)
 				return
 			}
@@ -119,7 +197,7 @@ export class Bot {
 		this.#running = true
 		const ltv = await this.computeLTV()
 
-		if (this.#config.options.shouldBorrowMore && +ltv.toFixed(3) < (goTo || this.#config.ltv.borrow)) {
+		if (this.#config.options.shouldBorrowMore && +ltv.toFixed(3) < (goTo ?? this.#config.ltv.borrow)) {
 			Logger.log(`LTV is at <code>${ltv.toFixed(3)}%</code>... borrowing...`)
 
 			const amountToBorrow = await this.computeAmountToBorrow(goTo)
@@ -134,7 +212,7 @@ export class Bot {
 			)
 		}
 
-		if (+ltv.toFixed(3) > (goTo || this.#config.ltv.limit)) {
+		if (+ltv.toFixed(3) > (goTo ?? this.#config.ltv.limit)) {
 			Logger.log(`LTV is at <code>${ltv.toFixed(3)}%</code>... repaying...`)
 
 			const amountToRepay = await this.computeAmountToRepay(goTo)
@@ -408,7 +486,7 @@ export class Bot {
 			const tx = await this.#wallet.createAndSignTx({ msgs: this.#txChannels[channelName] })
 			await this.#client.tx.broadcast(tx)
 		} catch (e) {
-			Logger.log(`An error occured\n${e.response.data}`)
+			Logger.log(`An error occured\n${JSON.stringify(e.response.data)}`)
 		} finally {
 			this.#txChannels[channelName] = []
 		}

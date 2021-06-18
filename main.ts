@@ -15,7 +15,7 @@ if (config.telegram.apiKey) {
 	tgBot.command('info', (ctx) => {
 		const { config, wallet } = bot.getContext()
 
-		ctx.replyWithHTML(dedent`<b>v0.2.5 - Anchor Borrow / Repay Bot</b>
+		ctx.replyWithHTML(dedent`<b>v0.2.6 - Anchor Borrow / Repay Bot</b>
 			Made by Romain Lanz
 			
 			<b>Network:</b> <code>${config.chainId === 'columbus-4' ? 'Mainnet' : 'Testnet'}</code>
@@ -29,6 +29,20 @@ if (config.telegram.apiKey) {
 				- <b>LIMIT:</b> <code>${config.ltv.limit}%</code>
 				- <b>BORROW:</b> <code>${config.ltv.borrow}%</code>
 		`)
+	})
+
+	// tgBot.command('repay', async (ctx) => {
+	// 	ctx.replyWithHTML('<b>PANIC MODE</b>: Repaying everything and stopping the bot.')
+	// 	await bot.repay()
+	// 	bot.pause()
+	// })
+
+	tgBot.command('run', () => {
+		bot.run()
+	})
+
+	tgBot.command('pause', () => {
+		bot.pause()
 	})
 
 	tgBot.command('compound', () => {
