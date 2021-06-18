@@ -18,12 +18,9 @@ const MICRO_MULTIPLIER = 1_000_000
 type Channels = { main: Msg[]; tgBot: Msg[] }
 type ChannelName = keyof Channels
 
-function sleep(s: number) {
-	return new Promise((resolve) => setTimeout(resolve, s * 1000))
-}
+type BotStatus = 'IDLE' | 'RUNNING' | 'PAUSE'
 
 export class Bot {
-	#running = false
 	#walletDenom: any
 	#config: Record<string, any>
 	#cache: Map<string, Decimal> = new Map()
@@ -31,7 +28,7 @@ export class Bot {
 	#anchor: Anchor
 	#wallet: Wallet
 	#txChannels: Channels = { main: [], tgBot: [] }
-	#pause = false
+	#status: BotStatus = 'IDLE'
 	#addressProvider: AddressProviderFromJson
 
 	constructor(config: any) {
@@ -101,11 +98,13 @@ export class Bot {
 	}
 
 	run() {
-		this.#pause = false
+		this.#status = 'IDLE'
+		Logger.log('Bot started')
 	}
 
 	pause() {
-		this.#pause = true
+		this.#status = 'PAUSE'
+		Logger.log('Bot paused')
 	}
 
 	// async repay() {
@@ -166,7 +165,7 @@ export class Bot {
 	// }
 
 	async execute(goTo?: number, channelName: ChannelName = 'main') {
-		if (this.#pause) {
+		if (this.#status === 'PAUSE') {
 			if (channelName === 'tgBot') {
 				Logger.log('Bot is paused, use <code>/run</code> to start it.')
 			}
@@ -174,7 +173,7 @@ export class Bot {
 			return
 		}
 
-		if (this.#running) {
+		if (this.#status === 'RUNNING') {
 			if (channelName === 'tgBot') {
 				Logger.log('Already running, please retry later.')
 			}
@@ -194,7 +193,7 @@ export class Bot {
 			}
 		}
 
-		this.#running = true
+		this.#status = 'RUNNING'
 		const ltv = await this.computeLTV()
 
 		if (this.#config.options.shouldBorrowMore && +ltv.toFixed(3) < (goTo ?? this.#config.ltv.borrow)) {
@@ -251,7 +250,7 @@ export class Bot {
 						Logger.toBroadcast(`Impossible to repay <code>${amountToRepay.toFixed(3)} UST</code>`, channelName)
 						Logger.broadcast(channelName)
 						this.#txChannels['main'] = []
-						this.#running = false
+						this.#status = 'IDLE'
 						return
 					}
 				}
@@ -269,17 +268,17 @@ export class Bot {
 			Logger.broadcast(channelName)
 		}
 
-		this.#running = false
+		this.#status = 'IDLE'
 	}
 
 	async compound() {
-		this.#running = true
+		this.#status = 'RUNNING'
 
 		Logger.log('Starting to compound...')
 
 		if (!process.env.VALIDATOR_ADDRESS) {
 			Logger.log('Invalid Validator Address')
-			this.#running = false
+			this.#status = 'IDLE'
 			return
 		}
 
@@ -353,15 +352,15 @@ export class Bot {
 		}
 
 		Logger.broadcast('tgBot')
-		this.#running = false
+		this.#status = 'IDLE'
 	}
 
 	getContext() {
-		return { config: this.#config, wallet: this.#wallet.key.accAddress }
+		return { config: this.#config, wallet: this.#wallet.key.accAddress, status: this.#status }
 	}
 
 	stopExecution() {
-		this.#running = false
+		this.#status = 'IDLE'
 	}
 
 	clearCache() {

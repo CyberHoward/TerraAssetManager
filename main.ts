@@ -13,7 +13,7 @@ if (config.telegram.apiKey) {
 	tgBot.command('ping', (ctx) => ctx.reply('Pong!'))
 
 	tgBot.command('info', (ctx) => {
-		const { config, wallet } = bot.getContext()
+		const { config, wallet, status } = bot.getContext()
 
 		ctx.replyWithHTML(dedent`<b>v0.2.6 - Anchor Borrow / Repay Bot</b>
 			Made by Romain Lanz
@@ -24,6 +24,8 @@ if (config.telegram.apiKey) {
 				${wallet}
 			</a>
 			
+			<b>Status:</b> <code>${status}</code>
+
 			<u>Configuration:</u>
 				- <b>SAFE:</b> <code>${config.ltv.safe}%</code>
 				- <b>LIMIT:</b> <code>${config.ltv.limit}%</code>
