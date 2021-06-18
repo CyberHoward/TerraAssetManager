@@ -92,3 +92,17 @@ You can add fake money to your Testnet Wallet using https://faucet.terra.money/.
 ## Tips
 
 If you want to send any tips, you can send them to `terra17lkkhegetxqua7s7g7k3xr9hxzcpvf8p878cnl`.
+
+## Changelogs
+
+### 0.2.6
+
+- **BREAKING** : Renamed `KEY` to `MNEMONIC` in `.env` file';
+- Added `/compound` command (ensure to copy `VALIDATOR_ADDRESS` from the `.env.example`);
+- Added `/run`;
+- Added `/pause`;
+- Added `/info`;
+- Added some safety for `/goto` and `/set`;
+- Verify environements variables at start;
+- Verify values when using `/set`;
+- Reboot the bot when it fails 5 times.
