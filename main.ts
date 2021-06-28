@@ -2,11 +2,11 @@ require('dotenv').config()
 import dedent from 'dedent-js'
 import { Telegraf } from 'telegraf'
 import config from './config'
-import { Bot } from './src/Bot'
+import { Bot } from './src/mBot'
 import { Logger } from './src/Logger'
 
 const bot = new Bot(config)
-
+/*
 if (config.telegram.apiKey) {
 	const tgBot = new Telegraf(config.telegram.apiKey)
 
@@ -92,7 +92,7 @@ if (config.telegram.apiKey) {
 
 	tgBot.launch()
 }
-
+*/
 async function main() {
 	try {
 		await bot.execute()
@@ -109,7 +109,7 @@ async function main() {
 		bot.stopExecution()
 		bot.clearCache()
 	}
-
+	Logger.log('Bot is waiting.')
 	setTimeout(main, config.options.waitFor * 1000)
 }
 
