@@ -26,9 +26,9 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/RomainLanz/anchor-repay.git"
+		"url": "git+https://github.com/OhmRoger/TerraAssetManager.git"
 	},
 	"bugs": {
-		"url": "https://github.com/RomainLanz/anchor-repay/issues"
+		"url": "https://github.com/OhmRoger/TerraAssetManager.git"
 	}
 }
