@@ -40,8 +40,6 @@ export class Bot {
     #balance: Decimal
     #mirror: Mirror
 	#CDPs: CDP [] = []
-	#tokenAdresses: any
-    #massets: Map<string,[AssetOptions,Decimal,number, number]> = new Map() //<asset_name, [assetInfo, position_id, collateralValue, lentValue ]
 	#wallet: Wallet
 	#txChannels: Channels = { main: [], tgBot: [] }
 	#status: BotStatus = 'IDLE'
@@ -227,6 +225,7 @@ export class Bot {
 			for (let j in this.#mirror.assets){
 				if(positions[i].asset.info.token.contract_addr === this.#mirror.assets[j].token.contractAddress){
 					let l = this.#CDPs.push(new CDP(this.#mirror, positions[i].idx,this.#mirror.assets[j].symbol,this.#addressProvider.aTerra(),positions[i].is_short, "uusd" ))
+					await this.#CDPs[l-1].updateOpenMarketParam()
 					await this.#CDPs[l-1].updateCDPTokenInfo()
 				}
 			}
@@ -316,7 +315,7 @@ export class Bot {
 	async constructBurnMsg(mAssetToRepay: Decimal, positionID: string){
 		let asset = (await this.#mirror.mint.getPosition(positionID)).asset;
 		console.log(asset.amount)
-		asset.amount = (mAssetToRepay.times(MICRO_MULTIPLIER)).toString();
+		asset.amount = (mAssetToRepay.times(MICRO_MULTIPLIER)).toFixed(0).toString();
 		console.log(asset.amount)
 		return this.#mirror.mint.burn(positionID,asset)
 	}
@@ -326,15 +325,6 @@ export class Bot {
 		return poolinfo
 	}
 
-	async getPositionInfo(asset: string){
-		let position: Map<string, [string,string]> = new Map() // Map<positionName,[Lentvalue,collateralvalue>]
-		for(let key of Array.from( this.#massets.keys())) {
-			if(key.includes(asset)){
-				const position = await this.#mirror.mint.getPosition(this.#massets.get(key)[1])
-				position.set(key,)
-			}
-		}
-	}
 
 	async contructUnstakeMsg(assetToken: string, amount: Decimal){
 		return this.#mirror.staking.unbond(assetToken,amount)
@@ -356,24 +346,6 @@ export class Bot {
             new Coins
         )
     }
-
-
-	async calculateOCR(collateral: Decimal, lentToken: Asset<Token>) {
-		const lentValue = await this.getLentValue(lentToken);
-		const collateralValue = await this.getCollateralValue(collateral)
-
-		return ((collateralValue/lentValue).toString())
-	}
-
-	async getLentValue(lentToken: Asset<Token>){ //OK
-		let assetPrice = await this.#mirror.oracle.getPrice("uusd",lentToken.info.token.contract_addr) 
-		return ((1/parseFloat(assetPrice.rate)) * (parseFloat(lentToken.amount)/MICRO_MULTIPLIER));
-	}
-
-	async getCollateralValue(amount: Decimal){
-		const aTerraRate = new Decimal(1) //live checken!
-		return (((amount.dividedBy(MICRO_MULTIPLIER)).times(aTerraRate)).toNumber())
-	}
 
 	computeDepositMessage(amount: Decimal) {
 		return this.#anchor.earn
@@ -427,7 +399,7 @@ export class Bot {
 	}
     
 
-
+	/*
 	computeOpenPositionMessage(camount: Decimal, asset_name: string, margin = this.#config.mOCR.limit){
 		const asset_info: Token = {
 			token:{
@@ -470,7 +442,7 @@ export class Bot {
 			new Coins
 		)
 		return [exMsg]
-		}
+		} */
 
 		async executeMSG(msgs, type = 'else'){
 			let fee = new StdFee(666666, '100000uusd')
@@ -521,20 +493,4 @@ export class Bot {
 			return new Promise((resolve) => setTimeout(resolve, ms));
 		}
 
-		async burnmAssetToCDP(assetName: string, repayPercentage: number){
-			let txs: Array<Msg> = [];
-			const pool = await this.getPoolInfo(this.#massets.get(assetName)[0].token)
-			console.log(this.#massets.get(assetName)[2])
-			const mAssetToRepay = new Decimal((this.#massets.get(assetName)[3] - (this.#massets.get(assetName)[2]/(repayPercentage+(this.#massets.get(assetName)[2]/this.#massets.get(assetName)[3]))))/assetPrice)
-			console.log(" I need to repay" + assetName + mAssetToRepay)
-			const totalLP = new Decimal(pool.total_bond_amount)
-			console.log(" total bonded " + totalLP)
-			const LPToBurn = (mAssetToRepay.times(totalLP).dividedBy(((totalLP.toPower(new Decimal(2))).dividedBy(assetPrice)).sqrt())).times(MICRO_MULTIPLIER)
-			
-			txs.push(await this.contructUnstakeMsg(pool.asset_token,LPToBurn))
-			txs.push(await this.constructUnbondMsg(assetName,LPToBurn))
-			txs.push(await this.constructBurnMsg(assetName,mAssetToRepay))
-			console.log(txs)
-			return txs
-		}
 }

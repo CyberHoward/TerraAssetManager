@@ -32,7 +32,7 @@ export class CDP{
     #isShort: Boolean
     mintable: Boolean 
     #time: Date
-    #timeLastUpdate: number
+    #marketOpenParams : [number, number] // Time and block of last price update 
 
 
     constructor(mirrorClient: Mirror ,idx: string, assetName: string, collateralName: string, isShort: Boolean, denom: string) {
@@ -43,8 +43,8 @@ export class CDP{
         this.assetAdress = this.#mirrorClient.assets[this.assetName].token.contractAddress
         this.#denom = denom
         this.#time = new Date()
-        this.#timeLastUpdate = this.#time.getT
-        console.log(this.#timeLastUpdate)
+        this.mintable = true // Nog aanpassen! 
+        this.#marketOpenParams = [0,0]
 	}
 
     async updateCDPTokenInfo(){
@@ -58,14 +58,14 @@ export class CDP{
 
     async updateAndGetRelativeOCR(){
         try{
-            
             this.collateralPrice = new Decimal((await this.#mirrorClient.collaterallOracle.getCollateralPrice(this.collateralName)).rate)
             const priceData = await this.#mirrorClient.oracle.getPrice(this.#denom,this.assetAdress)
-            
-            if (this.assetPrice != new Decimal(1/parseFloat(priceData.rate))){
-                this.#timeLastUpdate = this.#time.getTime()
+            console.log(`Current quote block is ${priceData.last_updated_quote} while last update was ${this.#marketOpenParams[1]}`)
+            if (this.#marketOpenParams[1] != priceData.last_updated_quote){
+                this.#marketOpenParams[0] = this.#time.getTime()
+                this.#marketOpenParams[1] = priceData.last_updated_quote
                 this.mintable = true
-            } else if (this.#time.getTime() - this.#timeLastUpdate   > 300){
+            } else if ((this.#marketOpenParams[0] <= this.#time.getTime() - 120000)){
                 this.mintable = false
             } 
 
@@ -81,6 +81,12 @@ export class CDP{
         }; 
     }
 
+    async updateOpenMarketParam(){
+        this.#marketOpenParams[0] = this.#time.getTime()
+        this.#marketOpenParams[1] = (await this.#mirrorClient.oracle.getPrice(this.#denom,this.assetAdress)).last_updated_quote
+        console.log(`Last quote block is ${this.#marketOpenParams[0]}`)
+    }
+
     getAssetAmountToRepay(desiredOcrMargin: Decimal){
         const goalOCR = desiredOcrMargin.add(this.#minCollateralRatio)
         const collateralValue = ((new Decimal(this.#collateralInfo.amount).times(this.collateralPrice)).dividedBy(this.#collateralMultiplier)).dividedBy(MICRO_MULTIPLIER)
@@ -91,7 +97,6 @@ export class CDP{
     }
 
     protected async setCollateralAssetInfo(){
-        console.log(this.collateralName)
         const collateralAssetInfo = await this.#mirrorClient.collaterallOracle.getCollateralAssetInfo(this.collateralName)
         
         this.collateralPrice = new Decimal((await this.#mirrorClient.collaterallOracle.getCollateralPrice(this.collateralName)).rate)
