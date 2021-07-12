@@ -25,7 +25,7 @@ export class CDP{
     #minCollateralRatio: number
     assetPrice: Decimal
     collateralPrice: Decimal
-    #collateralInfo: Asset<AssetInfo>
+    collateralInfo: Asset<AssetInfo>
     collateralName: string
     #collateralMultiplier: number
     assetInfo: Asset<Token>
@@ -71,7 +71,7 @@ export class CDP{
             this.assetPrice = new Decimal(1/parseFloat(priceData.rate))
             
             //console.log(`The price of ${this.assetName} is ${this.assetPrice}`)
-            const collateralValue = (new Decimal(this.#collateralInfo.amount).times(this.collateralPrice)).dividedBy(MICRO_MULTIPLIER) 
+            const collateralValue = (new Decimal(this.collateralInfo.amount).times(this.collateralPrice)).dividedBy(MICRO_MULTIPLIER) 
             const lentValue = (new Decimal(this.assetInfo.amount).times(this.assetPrice)).dividedBy(MICRO_MULTIPLIER) 
             //Logger.log(`The ${this.assetName} lent value is: ${lentValue} with a collateral value of: ${collateralValue} resulting in a OCR ratio of ${collateralValue.dividedBy(lentValue.times(this.#collateralMultiplier))}.`)
             return (collateralValue.dividedBy(lentValue.times(this.#collateralMultiplier))).minus(this.#minCollateralRatio);
@@ -88,7 +88,7 @@ export class CDP{
 
     getAssetAmountToCompensate(desiredOcrMargin: Decimal){
         const goalOCR = desiredOcrMargin.add(this.#minCollateralRatio)
-        const collateralValue = ((new Decimal(this.#collateralInfo.amount).times(this.collateralPrice)).dividedBy(this.#collateralMultiplier)).dividedBy(MICRO_MULTIPLIER)
+        const collateralValue = ((new Decimal(this.collateralInfo.amount).times(this.collateralPrice)).dividedBy(this.#collateralMultiplier)).dividedBy(MICRO_MULTIPLIER)
         const lentValue = (new Decimal(this.assetInfo.amount).times(this.assetPrice)).dividedBy(MICRO_MULTIPLIER)
         const currentOCR = collateralValue.dividedBy(lentValue)
         // Logger.log(`Need to transact ${lentValue.minus(collateralValue.dividedBy((goalOCR.minus(currentOCR)).plus(collateralValue.dividedBy(lentValue)))).dividedBy(this.assetPrice)} ${this.assetName}`)
@@ -97,7 +97,6 @@ export class CDP{
 
     protected async setCollateralAssetInfo(){
         const collateralAssetInfo = await this.#mirrorClient.collaterallOracle.getCollateralAssetInfo(this.collateralName)
-        
         this.collateralPrice = new Decimal((await this.#mirrorClient.collaterallOracle.getCollateralPrice(this.collateralName)).rate)
         this.#collateralMultiplier = parseFloat(collateralAssetInfo.multiplier)
         // Logger.log("The collateral price is updated to: " + this.collateralPrice.toString() +"\n By using this collateral the minimum OCR is multiplied with a factor of : " + this.#collateralMultiplier)
@@ -105,7 +104,7 @@ export class CDP{
 
     protected async setAssetAndCollateralInfo(){
         const CDP = await this.#mirrorClient.mint.getPosition(this.idx)
-        this.#collateralInfo = CDP.collateral
+        this.collateralInfo = CDP.collateral
         this.assetInfo = CDP.asset
         this.#isShort = CDP.is_short
         this.#minCollateralRatio = parseFloat((await this.#mirrorClient.mint.getAssetConfig((<Token> this.assetInfo.info ).token.contract_addr )).min_collateral_ratio)

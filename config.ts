@@ -51,5 +51,6 @@ export default {
 	notification: {
 		tty: true,
 		telegram: true,
+		
 	},
 }

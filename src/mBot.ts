@@ -254,9 +254,10 @@ export class Bot {
 	async tryRepay(CDP: CDP, channelName: ChannelName){
 		try{
 			let repayAmount = (CDP.getAssetAmountToCompensate(new Decimal(this.#config.mOCR.safe).dividedBy(100)))
-			console.log(`Need to repay ${repayAmount} of mAsset`)
-			let LPtoBurn = await this.sufficientStaked(CDP.assetAdress, repayAmount, CDP.assetPrice)
-			let collateralBalance = await this.getCollateralBalance(CDP.collateralName)
+			console.log(`Need to repay ${repayAmount} of ${CDP.assetName}`)
+			let LPtoBurn = (await this.sufficientStaked(CDP.assetAdress, repayAmount, CDP.assetPrice)).floor()
+			let collateralBalance = await this.getTokenBalance(CDP.collateralName)
+			let assetBalance = await this.getTokenBalance(CDP.assetAdress)
 			if (CDP.mintable) {
 				if (LPtoBurn.greaterThan(new Decimal(0))){ // Enough long tokens staked to repay CDP
 					this.toBroadcast(await this.contructUnstakeMsg(CDP.assetAdress, LPtoBurn), channelName)
@@ -265,25 +266,30 @@ export class Bot {
 					console.log("broadcasting")
 					await this.broadcast(channelName)
 					await CDP.updateCDPTokenInfo()
-				}else if (collateralBalance.greaterThanOrEqualTo(repayAmount.times(CDP.assetPrice).dividedBy(CDP.collateralPrice))){ // Not enough long tokens staked to repay CDP
+				}else if (assetBalance.greaterThanOrEqualTo(repayAmount)){ // Not enough long tokens staked to repay CDP, enough tokens in wallet? 
 					Logger.log("Genoeg massets om terug te betalen")
 					this.toBroadcast(await this.constructBurnMsg(repayAmount, CDP.idx), channelName)
 					console.log("broadcasting")
 					await this.broadcast(channelName)
 					await CDP.updateCDPTokenInfo()
-				}else {
-					Logger.log('RIP')
+				}else if (collateralBalance.dividedBy(MICRO_MULTIPLIER).greaterThanOrEqualTo(repayAmount.times(CDP.assetPrice))) {
+					Logger.log('Repay with aUST')
+					this.toBroadcast(this.constructCollateralDepositMsg(CDP,repayAmount.times(CDP.assetPrice)), channelName)
+					await this.broadcast(channelName)
+					await CDP.updateCDPTokenInfo()
 				}
-			} else {
+			} else if (collateralBalance.dividedBy(MICRO_MULTIPLIER).greaterThanOrEqualTo(repayAmount.times(CDP.assetPrice))) {
 				Logger.log('Repay with aUST')
+				this.toBroadcast(this.constructCollateralDepositMsg(CDP,repayAmount.times(CDP.assetPrice)), channelName)
+				await this.broadcast(channelName)
+				await CDP.updateCDPTokenInfo()
 			}
-			
 		} catch(err){
 			Logger.log( `Error in repaying CDP ${err}`)
 		}
 	}
 	
-	async getCollateralBalance(collateralTokenAddress : string){
+	async getTokenBalance(collateralTokenAddress : string){
 		const TSToken = new TerraswapToken({contractAddress: collateralTokenAddress, lcd : this.#wallet.lcd})
 		const collBalance = new  Decimal((await TSToken.getBalance(this.#wallet.key.accAddress)).balance)
 		return collBalance
@@ -328,6 +334,11 @@ export class Bot {
 		return this.#mirror.mint.burn(positionID,asset)
 	}
 
+	constructCollateralDepositMsg(CDP:CDP, neededUSTValue: Decimal){
+		const collateralAmount = neededUSTValue.dividedBy(CDP.collateralPrice)
+		let collateralAsset: Asset<AssetInfo> = {info: CDP.collateralInfo.info, amount : collateralAmount.toString()}
+		return this.#mirror.mint.deposit(new Decimal(CDP.idx),collateralAsset)
+	}
 	async borrowMore(CDP: CDP, channelName){
 		let mintAmount = (CDP.getAssetAmountToCompensate(new Decimal(this.#config.mOCR.safe).dividedBy(100))).abs()
 		// console.log(`I can borrow ${mintAmount} more massets`)
@@ -399,7 +410,10 @@ export class Bot {
 	private async broadcast(channelName: ChannelName) {
 		try {
 			// console.log("Sending these transactions")
-			// console.log(this.#txChannels[channelName][0])
+			for (let j in this.#txChannels[channelName]){
+				console.log(this.#txChannels[channelName][j])
+			}
+			
 			const tx = await this.#wallet.createAndSignTx({ msgs: this.#txChannels[channelName] })
 			await this.#client.tx.broadcast(tx)
 		} catch (e) {
