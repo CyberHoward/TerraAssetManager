@@ -20,7 +20,7 @@ export default {
 		shouldCompoundsRewards: true,
 
 		// This define the number of SECONDS to wait between each verification.
-		waitFor: 15,
+		waitFor: 60,
 	},
 
 	ltv: {
@@ -40,11 +40,11 @@ export default {
 	// example, TSLA mint is liquidated when LTV > 50% so with a 15% margin the script will repay some TSLA at 35% LTV 
 	mOCR: {
 		
-		limit: 10,
+		limit: 10.8,
 
-		safe: 15,
+		safe: 11,
 
-		borrow: 20,
+		borrow: 11.2,
 
 	},
 
