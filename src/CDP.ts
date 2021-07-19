@@ -43,7 +43,7 @@ export class CDP{
         this.assetAdress = this.#mirrorClient.assets[this.assetName].token.contractAddress
         this.#denom = denom
         this.#time = new Date()
-        this.mintable = true // Nog aanpassen! 
+        this.mintable = false // Nog aanpassen! 
         this.#marketOpenParams = [0,0]
 	}
 

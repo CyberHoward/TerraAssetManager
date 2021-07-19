@@ -1,18 +1,21 @@
 import { dset } from 'dset'
 import dedent from 'dedent-js'
 import Decimal from 'decimal.js'
-import { Coin, Coins, Denom, LCDClient, MnemonicKey, Msg, MsgExecuteContract, MsgSwap, StdFee, Wallet } from '@terra-money/terra.js'
+import { Coin, Coins, Denom, LCDClient, LocalTerra, MnemonicKey, Msg, MsgExecuteContract, MsgSwap, StdFee, Wallet } from '@terra-money/terra.js'
 import {
 	AddressProviderFromJson,
 	Anchor,
 	COLLATERAL_DENOMS,
 	columbus4,
+	fabricateTerraswapProvideLiquidityANC,
+	fabricateTerraswapProvideLiquiditybLuna,
 	MARKET_DENOMS,
 	tequila0004,
 } from '@anchor-protocol/anchor.js'
-import {DEFAULT_TEQUILA_MIRROR_OPTIONS, DEFAULT_MIRROR_OPTIONS, Mirror, AssetInfo, Token, Asset, MirrorMint, AssetOptions, isNativeToken, TerraswapToken, } from '@mirror-protocol/mirror.js'
+import {DEFAULT_TEQUILA_MIRROR_OPTIONS, DEFAULT_MIRROR_OPTIONS, Mirror, AssetInfo, Token, Asset, MirrorMint, AssetOptions, isNativeToken, TerraswapToken, NativeToken, TerraswapPair, } from '@mirror-protocol/mirror.js'
 import { Logger } from './Logger'
 import { CDP } from './CDP'
+import terra from "@terra-money/terra.js"
 
 const MICRO_MULTIPLIER = 1_000_000
 
@@ -327,13 +330,14 @@ export class Bot {
 	}
 
 	
-
+	// CDP
 	async constructBurnMsg(mAssetToRepay: Decimal, positionID: string){
 		let asset = (await this.#mirror.mint.getPosition(positionID)).asset;
 		asset.amount = (mAssetToRepay.times(MICRO_MULTIPLIER)).toFixed(0);
 		return this.#mirror.mint.burn(positionID,asset)
 	}
 
+	// CDP
 	constructCollateralDepositMsg(CDP:CDP, neededUSTValue: Decimal){
 		const collateralAmount = neededUSTValue.dividedBy(CDP.collateralPrice)
 		let collateralAsset: Asset<AssetInfo> = {info: CDP.collateralInfo.info, amount : collateralAmount.toString()}
@@ -343,9 +347,59 @@ export class Bot {
 		let mintAmount = (CDP.getAssetAmountToCompensate(new Decimal(this.#config.mOCR.safe).dividedBy(100))).abs()
 		// console.log(`I can borrow ${mintAmount} more massets`)
 		this.toBroadcast(this.constructMintMsg(CDP, mintAmount), channelName)
+		if (this.#balance.greaterThan(mintAmount.times(CDP.assetPrice))){
+			//this.toBroadcast(this.constructLPMsg(CDP, mintAmount), channelName) //Stake if enough ust in wallet 
+		}
 		await this.broadcast(channelName)
 		await CDP.updateCDPTokenInfo()
 	}
+	// CDP
+	
+	constructLPMsg(CDP: CDP, amount: Decimal){
+		const denomAsset: Asset<NativeToken> = {info: <NativeToken>{native_token: {denom: Denom.USD}}, amount : (amount.times(CDP.assetPrice).times(MICRO_MULTIPLIER)).toFixed(0)}
+		const tokenAsset: Asset<Token> = {info: CDP.assetInfo.info, amount : (amount.times(MICRO_MULTIPLIER)).toFixed(0)}
+		const address = this.#wallet.key.accAddress
+		const pairAddress = this.#mirror.assets[CDP.assetName].pair.contractAddress
+		const tokenAddress = tokenAsset.info.token.contract_addr
+
+		let msg = [
+			new terra.MsgExecuteContract(address, tokenAddress, {
+				increase_allowance: {
+					spender: pairAddress,
+					amount: tokenAsset.amount,
+					expires: { never: {} },
+				},
+			}),
+			new terra.MsgExecuteContract(address, pairAddress, {
+				provide_liquidity: {
+					assets: [
+						{
+							info: {
+								token: {
+									contract_addr: tokenAddress,
+								},
+							},
+							amount: tokenAsset.amount,
+						},
+						{
+							info: {
+								native_token: {
+									denom: denomAsset.info.native_token.denom,
+								},
+							},
+							amount: denomAsset.amount,
+						},
+					],
+					slippage_tolerance: slippage_tolerance
+						? slippage_tolerance
+						: undefined,
+				},
+			}, coins),
+		]
+		console.log(tokenAsset)
+		return this.#mirror.staking.autoStake(denomAsset,tokenAsset)
+	}
+	// CDP
 
 	constructMintMsg(CDP: CDP, amount: Decimal){
 		const assetToken = CDP.assetInfo
@@ -358,10 +412,12 @@ export class Bot {
 		return poolinfo
 	}
 
+	// CDP
 
 	async contructUnstakeMsg(assetToken: string, amount: Decimal){
 		return this.#mirror.staking.unbond(assetToken,amount)
 	}
+	// CDP
 
 	async constructUnbondMsg( tokenName: string, LP_token_amount: Decimal){
 		const amount = LP_token_amount.toFixed(0)
@@ -412,6 +468,7 @@ export class Bot {
 			// console.log("Sending these transactions")
 			for (let j in this.#txChannels[channelName]){
 				console.log(this.#txChannels[channelName][j])
+				
 			}
 			
 			const tx = await this.#wallet.createAndSignTx({ msgs: this.#txChannels[channelName] })
