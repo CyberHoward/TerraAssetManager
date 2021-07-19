@@ -33,7 +33,7 @@ export default {
 		// This define the low-limit when the bot will borrow more.
 		borrow: 30,
 	},
-	denom: 'uusd',
+	
 	LPs: ['mTSLA','mABNB','mBTC'],
 
 	// Safety margin in percentage (liquidation LTV - max LTV) = 15%

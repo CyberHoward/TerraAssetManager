@@ -15,8 +15,8 @@ import {
 import {DEFAULT_TEQUILA_MIRROR_OPTIONS, DEFAULT_MIRROR_OPTIONS, Mirror, AssetInfo, Token, Asset, MirrorMint, AssetOptions, isNativeToken, TerraswapToken, NativeToken, TerraswapPair, } from '@mirror-protocol/mirror.js'
 import { Logger } from './Logger'
 import { CDP } from './CDP'
-import terra from "@terra-money/terra.js"
-
+import {AnchorCDP} from './AnchorCDP'
+//import terra from "@terra-money/terra.js"
 const MICRO_MULTIPLIER = 1_000_000
 
 // TODO: See if we can make it dynamic
@@ -39,7 +39,7 @@ export class Bot {
 	#config: Record<string, any>
 	#cache: Map<string, Decimal> = new Map()
 	#client: LCDClient
-    #anchor: Anchor
+    #anchorCDP: AnchorCDP
     #balance: Decimal
     #mirror: Mirror
 	#CDPs: CDP [] = []
@@ -61,11 +61,7 @@ export class Bot {
 		const key = new MnemonicKey({ mnemonic: this.#config.mnemonic })
 		this.#walletDenom = this.#config.denom
 
-		// Initialization of the Anchor Client
-		const provider = this.#config.chainId === 'columbus-4' ? columbus4 : tequila0004
-		this.#addressProvider = new AddressProviderFromJson(provider)
-		this.#anchor = new Anchor(this.#client, this.#addressProvider)
-
+		
         // Intialize Mirror Client
         let miroptions = this.#config.chainId === 'columbus-4' ? DEFAULT_MIRROR_OPTIONS : DEFAULT_TEQUILA_MIRROR_OPTIONS
 		miroptions.lcd = this.#client
@@ -85,8 +81,10 @@ export class Bot {
 			market: this.#config.denom
 		}
 
-        
-
+		// Initialization of the Anchor CDP
+		const provider = this.#config.chainId === 'columbus-4' ? columbus4 : tequila0004
+		this.#addressProvider = new AddressProviderFromJson(provider)
+		this.#anchorCDP = new AnchorCDP(new Anchor(this.#client, this.#addressProvider),this.#walletDenom, this.#config, this.#wallet)
 
 		Logger.log(dedent`<b>v0.2.6 - Anchor Borrow / Repay Bot</b>
 				Made by Romain Lanz
@@ -223,13 +221,16 @@ export class Bot {
     //What loans do I have? 
     async setCDPs(){ 
         const positions = (await this.#mirror.mint.getPositions(this.#wallet.key.accAddress)).positions
+		
 		for (let i in positions){
 			for (let j in this.#mirror.assets){
+				
 				if(positions[i].asset.info.token.contract_addr === this.#mirror.assets[j].token.contractAddress){
 					let l = this.#CDPs.push(new CDP(this.#mirror, positions[i].idx,this.#mirror.assets[j].symbol,this.#addressProvider.aTerra(),positions[i].is_short, "uusd" ))
 					await this.#CDPs[l-1].updateOpenMarketParam()
 					await this.#CDPs[l-1].updateCDPTokenInfo()
 				}
+
 			}
 		}
 		console.log("CDPs are set!")
@@ -240,10 +241,11 @@ export class Bot {
 		for (let i in this.#CDPs){
 			let OCRmargin = await this.#CDPs[i].updateAndGetRelativeOCR()
 			console.log("OCR margin is: " + OCRmargin)
+			
 			if(OCRmargin.lessThan(new Decimal(this.#config.mOCR.limit).dividedBy(100))){
 				await this.tryRepay(this.#CDPs[i], channelName)
 			}else if (OCRmargin.greaterThan(new Decimal(this.#config.mOCR.borrow).dividedBy(100))) {
-				await this.borrowMore(this.#CDPs[i], channelName)
+				await this.shortMore(this.#CDPs[i], channelName)
 			}
 
 			//See if locked funds from shorting can be claimed 
@@ -256,34 +258,46 @@ export class Bot {
 
 	async tryRepay(CDP: CDP, channelName: ChannelName){
 		try{
+
 			let repayAmount = (CDP.getAssetAmountToCompensate(new Decimal(this.#config.mOCR.safe).dividedBy(100)))
 			console.log(`Need to repay ${repayAmount} of ${CDP.assetName}`)
 			let LPtoBurn = (await this.sufficientStaked(CDP.assetAdress, repayAmount, CDP.assetPrice)).floor()
 			let collateralBalance = await this.getTokenBalance(CDP.collateralName)
 			let assetBalance = await this.getTokenBalance(CDP.assetAdress)
+			
 			if (CDP.mintable) {
 				if (LPtoBurn.greaterThan(new Decimal(0))){ // Enough long tokens staked to repay CDP
-					this.toBroadcast(await this.contructUnstakeMsg(CDP.assetAdress, LPtoBurn), channelName)
-					this.toBroadcast(await this.constructUnbondMsg(CDP.assetName, LPtoBurn), channelName)
-					this.toBroadcast(await this.constructBurnMsg(repayAmount, CDP.idx), channelName)
+					
+					this.toBroadcast(await CDP.contructUnstakeMsg(LPtoBurn), channelName)
+					this.toBroadcast(await CDP.constructUnbondMsg(LPtoBurn), channelName)
+					this.toBroadcast(await CDP.constructBurnMsg(repayAmount), channelName)
+					
+					// TODO: if high premium is present, this will fail since the mAsset received will be less then expected
+					//Solution: replace price with on-chain asset price
 					console.log("broadcasting")
 					await this.broadcast(channelName)
+					
 					await CDP.updateCDPTokenInfo()
 				}else if (assetBalance.greaterThanOrEqualTo(repayAmount)){ // Not enough long tokens staked to repay CDP, enough tokens in wallet? 
 					Logger.log("Genoeg massets om terug te betalen")
-					this.toBroadcast(await this.constructBurnMsg(repayAmount, CDP.idx), channelName)
+					
+					this.toBroadcast(await CDP.constructBurnMsg(repayAmount), channelName)
+					
 					console.log("broadcasting")
 					await this.broadcast(channelName)
 					await CDP.updateCDPTokenInfo()
 				}else if (collateralBalance.dividedBy(MICRO_MULTIPLIER).greaterThanOrEqualTo(repayAmount.times(CDP.assetPrice))) {
 					Logger.log('Repay with aUST')
-					this.toBroadcast(this.constructCollateralDepositMsg(CDP,repayAmount.times(CDP.assetPrice)), channelName)
+					
+					this.toBroadcast(CDP.constructCollateralDepositMsg(repayAmount.times(CDP.assetPrice)), channelName)
 					await this.broadcast(channelName)
 					await CDP.updateCDPTokenInfo()
 				}
-			} else if (collateralBalance.dividedBy(MICRO_MULTIPLIER).greaterThanOrEqualTo(repayAmount.times(CDP.assetPrice))) {
+
+			} else if (collateralBalance.dividedBy(MICRO_MULTIPLIER).greaterThanOrEqualTo(repayAmount.times(CDP.assetPrice).times(CDP.minCollateralRatio))) {
 				Logger.log('Repay with aUST')
-				this.toBroadcast(this.constructCollateralDepositMsg(CDP,repayAmount.times(CDP.assetPrice)), channelName)
+				
+				this.toBroadcast(CDP.constructCollateralDepositMsg(repayAmount.times(CDP.assetPrice)), channelName)
 				await this.broadcast(channelName)
 				await CDP.updateCDPTokenInfo()
 			}
@@ -329,117 +343,21 @@ export class Bot {
 		}
 	}
 
-	
-	// CDP
-	async constructBurnMsg(mAssetToRepay: Decimal, positionID: string){
-		let asset = (await this.#mirror.mint.getPosition(positionID)).asset;
-		asset.amount = (mAssetToRepay.times(MICRO_MULTIPLIER)).toFixed(0);
-		return this.#mirror.mint.burn(positionID,asset)
-	}
-
-	// CDP
-	constructCollateralDepositMsg(CDP:CDP, neededUSTValue: Decimal){
-		const collateralAmount = neededUSTValue.dividedBy(CDP.collateralPrice)
-		let collateralAsset: Asset<AssetInfo> = {info: CDP.collateralInfo.info, amount : collateralAmount.toString()}
-		return this.#mirror.mint.deposit(new Decimal(CDP.idx),collateralAsset)
-	}
-	async borrowMore(CDP: CDP, channelName){
-		let mintAmount = (CDP.getAssetAmountToCompensate(new Decimal(this.#config.mOCR.safe).dividedBy(100))).abs()
+	async shortMore(CDP: CDP, channelName){
+		let shortAmount = (CDP.getAssetAmountToCompensate(new Decimal(this.#config.mOCR.safe).dividedBy(100))).abs()
+		const neededUST = (await CDP.getOnchainReverseSim(shortAmount)).dividedBy(MICRO_MULTIPLIER)
 		// console.log(`I can borrow ${mintAmount} more massets`)
-		this.toBroadcast(this.constructMintMsg(CDP, mintAmount), channelName)
-		if (this.#balance.greaterThan(mintAmount.times(CDP.assetPrice))){
-			//this.toBroadcast(this.constructLPMsg(CDP, mintAmount), channelName) //Stake if enough ust in wallet 
+		if (this.#balance.greaterThan(neededUST.times(2))){
+			this.toBroadcast(CDP.constructMintMsg(shortAmount), channelName)
+			this.toBroadcast(CDP.constructBuyAndLPMsg(shortAmount, neededUST), channelName) //Stake if enough ust in wallet 
 		}
 		await this.broadcast(channelName)
 		await CDP.updateCDPTokenInfo()
-	}
-	// CDP
-	
-	constructLPMsg(CDP: CDP, amount: Decimal){
-		const denomAsset: Asset<NativeToken> = {info: <NativeToken>{native_token: {denom: Denom.USD}}, amount : (amount.times(CDP.assetPrice).times(MICRO_MULTIPLIER)).toFixed(0)}
-		const tokenAsset: Asset<Token> = {info: CDP.assetInfo.info, amount : (amount.times(MICRO_MULTIPLIER)).toFixed(0)}
-		const address = this.#wallet.key.accAddress
-		const pairAddress = this.#mirror.assets[CDP.assetName].pair.contractAddress
-		const tokenAddress = tokenAsset.info.token.contract_addr
-
-		let msg = [
-			new terra.MsgExecuteContract(address, tokenAddress, {
-				increase_allowance: {
-					spender: pairAddress,
-					amount: tokenAsset.amount,
-					expires: { never: {} },
-				},
-			}),
-			new terra.MsgExecuteContract(address, pairAddress, {
-				provide_liquidity: {
-					assets: [
-						{
-							info: {
-								token: {
-									contract_addr: tokenAddress,
-								},
-							},
-							amount: tokenAsset.amount,
-						},
-						{
-							info: {
-								native_token: {
-									denom: denomAsset.info.native_token.denom,
-								},
-							},
-							amount: denomAsset.amount,
-						},
-					],
-					slippage_tolerance: slippage_tolerance
-						? slippage_tolerance
-						: undefined,
-				},
-			}, coins),
-		]
-		console.log(tokenAsset)
-		return this.#mirror.staking.autoStake(denomAsset,tokenAsset)
-	}
-	// CDP
-
-	constructMintMsg(CDP: CDP, amount: Decimal){
-		const assetToken = CDP.assetInfo
-		assetToken.amount = amount.times(MICRO_MULTIPLIER).toFixed(0)
-		return this.#mirror.mint.mint(new Decimal(CDP.idx),assetToken)
 	}
 
 	async getPoolInfo(assetAdress: string){
 		const poolinfo = await this.#mirror.staking.getPoolInfo(assetAdress)
 		return poolinfo
-	}
-
-	// CDP
-
-	async contructUnstakeMsg(assetToken: string, amount: Decimal){
-		return this.#mirror.staking.unbond(assetToken,amount)
-	}
-	// CDP
-
-	async constructUnbondMsg( tokenName: string, LP_token_amount: Decimal){
-		const amount = LP_token_amount.toFixed(0)
-        //  console.log('Withdrawing '+tokenName+' LP...')
-        return new MsgExecuteContract(
-            this.#wallet.key.accAddress,
-			this.#mirror.assets[tokenName].lpToken.contractAddress,
-            {
-                send:{
-					amount: amount,
-                    contract: this.#mirror.assets[tokenName].pair.contractAddress,
-                    msg: "eyJ3aXRoZHJhd19saXF1aWRpdHkiOnt9fQ=="
-                }
-            },
-            new Coins
-        )
-    }
-
-	computeDepositMessage(amount: Decimal) {
-		return this.#anchor.earn
-			.depositStable({ amount: amount.toFixed(3), market: MARKET_DENOMS.UUSD })
-			.generateWithWallet(this.#wallet)
 	}
 
     stopExecution() {
@@ -489,6 +407,17 @@ export class Bot {
 		this.#cache.set(key, value)
 
 		return value
+	}
+
+	async getLunaBalance(): Promise<Decimal> {
+		const coins = await this.#client.bank.balance(this.#wallet.key.accAddress)
+		const lunaCoin = coins.get(Denom.LUNA)
+
+		if (!lunaCoin) {
+			return new Decimal(0)
+		}
+
+		return lunaCoin.amount.dividedBy(MICRO_MULTIPLIER)
 	}
     
 
