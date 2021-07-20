@@ -33,24 +33,21 @@ export default {
 		// This define the low-limit when the bot will borrow more.
 		borrow: 30,
 	},
-	
-	LPs: ['mTSLA','mABNB','mBTC'],
+
+	LPs: ['mTSLA', 'mABNB', 'mBTC'],
 
 	// Safety margin in percentage (liquidation LTV - max LTV) = 15%
-	// example, TSLA mint is liquidated when LTV > 50% so with a 15% margin the script will repay some TSLA at 35% LTV 
+	// example, TSLA mint is liquidated when LTV > 50% so with a 15% margin the script will repay some TSLA at 35% LTV
 	mOCR: {
-		
 		limit: 10.8,
 
 		safe: 11,
 
 		borrow: 11.2,
-
 	},
 
 	notification: {
 		tty: true,
 		telegram: true,
-		
 	},
 }

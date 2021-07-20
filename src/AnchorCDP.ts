@@ -1,7 +1,19 @@
 import { dset } from 'dset'
 import dedent from 'dedent-js'
 import Decimal from 'decimal.js'
-import { Coin, Coins, Denom, LCDClient, LocalTerra, MnemonicKey, Msg, MsgExecuteContract, MsgSwap, StdFee, Wallet } from '@terra-money/terra.js'
+import {
+	Coin,
+	Coins,
+	Denom,
+	LCDClient,
+	LocalTerra,
+	MnemonicKey,
+	Msg,
+	MsgExecuteContract,
+	MsgSwap,
+	StdFee,
+	Wallet,
+} from '@terra-money/terra.js'
 import {
 	AddressProviderFromJson,
 	Anchor,
@@ -12,24 +24,22 @@ import {
 	MARKET_DENOMS,
 	tequila0004,
 } from '@anchor-protocol/anchor.js'
-import {DEFAULT_TEQUILA_MIRROR_OPTIONS, DEFAULT_MIRROR_OPTIONS, Mirror, AssetInfo, Token, Asset, MirrorMint, AssetOptions, isNativeToken, TerraswapToken, NativeToken, TerraswapPair, } from '@mirror-protocol/mirror.js'
 import { Logger } from './Logger'
 import { CDP } from './CDP'
 //import terra from "@terra-money/terra.js"
 const MICRO_MULTIPLIER = 1_000_000
 
 export class AnchorCDP {
-
 	#denom: any
 	#config: any
 	#anchor: Anchor
 	#wallet: Wallet
-	
+
 	constructor(anchor: Anchor, denom: any, config: any, wallet: Wallet) {
 		this.#wallet = wallet
 		this.#anchor = anchor
 		this.#denom = denom
-		this.#config = config 
+		this.#config = config
 	}
 	async computeLTV() {
 		const borrowedValue = await this.getBorrowedValue()
@@ -53,23 +63,23 @@ export class AnchorCDP {
 		return new Decimal(target).times(borrowLimit.times(2)).dividedBy(100).minus(borrowedValue)
 	}
 
-	async getDeposit(){
+	async getDeposit() {
 		return new Decimal(await this.#anchor.earn.getTotalDeposit(this.#denom))
 	}
 
-	async getBorrowedValue(){
+	async getBorrowedValue() {
 		return new Decimal(await this.#anchor.borrow.getBorrowedValue(this.#denom))
 	}
 
-	async getBorrowLimit(){
+	async getBorrowLimit() {
 		return new Decimal(await this.#anchor.borrow.getBorrowLimit(this.#denom))
 	}
 
-	async getANCBalance(){
+	async getANCBalance() {
 		return new Decimal(await this.#anchor.anchorToken.getBalance(this.#wallet.key.accAddress))
 	}
 
-	async getANCPrice(){
+	async getANCPrice() {
 		return new Decimal(await this.#anchor.anchorToken.getANCPrice())
 	}
 
@@ -108,5 +118,4 @@ export class AnchorCDP {
 	executeClaimRewards() {
 		return this.#anchor.anchorToken.claimUSTBorrowRewards({ market: MARKET_DENOMS.UUSD }).execute(this.#wallet, {})
 	}
-	
 }
