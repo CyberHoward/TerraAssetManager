@@ -15,8 +15,7 @@ if (config.telegram.apiKey) {
 	tgBot.command('info', (ctx) => {
 		const { config, wallet, status } = bot.getContext()
 
-		ctx.replyWithHTML(dedent`<b>v0.2.6 - Anchor Borrow / Repay Bot</b>
-			Made by Romain Lanz
+		ctx.replyWithHTML(dedent`<b>v0.1 - Terra Yield Optimizer Bot</b>
 			
 			<b>Network:</b> <code>${config.chainId === 'columbus-4' ? 'Mainnet' : 'Testnet'}</code>
 			<b>Address:</b>
@@ -107,7 +106,6 @@ async function main() {
 		Logger.clearChannel('main')
 	} finally {
 		bot.stopExecution()
-		bot.clearCache()
 	}
 	Logger.log('Bot is waiting.')
 	setTimeout(main, config.options.waitFor * 1000)
@@ -125,7 +123,7 @@ if (process.env.CHAIN_ID && process.env.CHAIN_ID.split('-').length !== 2) {
 	throw new Error('Invalid CHAIN ID provided.')
 }
 
-if (config.ltv.limit > 49) {
+if (config.ltv.limit > 59) {
 	throw new Error('ltv.limit is too high.')
 }
 

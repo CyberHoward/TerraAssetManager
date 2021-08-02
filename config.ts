@@ -20,20 +20,20 @@ export default {
 		shouldCompoundsRewards: true,
 
 		// This define the number of SECONDS to wait between each verification.
-		waitFor: 60,
+		waitFor: 10,
 	},
 
 	ltv: {
 		// This define the limit when the bot will repay your debt.
-		limit: 43,
+		limit: 50,
 
 		// This define the safe-limit that the bot will reach when repaying or borrowing more.
-		safe: 35,
+		safe: 49,
 
 		// This define the low-limit when the bot will borrow more.
-		borrow: 30,
+		borrow: 48,
 	},
-
+	denom: "uusd",
 	LPs: ['mTSLA', 'mABNB', 'mBTC'],
 
 	// Safety margin in percentage (liquidation LTV - max LTV) = 15%
@@ -45,6 +45,10 @@ export default {
 
 		borrow: 11.2,
 	},
+
+	// Max aUST/lentUST in % 
+	// When this margin is exceeded half of the deposits are used to farm MIR. 
+	maxDepositToLentRatio: 10, 
 
 	notification: {
 		tty: true,
