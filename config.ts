@@ -48,7 +48,9 @@ export default {
 
 	// Max aUST/lentUST in % 
 	// When this margin is exceeded half of the deposits are used to farm MIR. 
-	maxDepositToLentRatio: 10, 
+	maxDepositToLentRatio: 40, 
+
+	fractionToMirFarm: 20,
 
 	notification: {
 		tty: true,

@@ -37,6 +37,7 @@ export class AnchorCDP {
 	#wallet: Wallet
 	LTV: Decimal
 	lentValue: Decimal
+	
 
 	constructor(anchor: Anchor, denom: {address: string,market: MARKET_DENOMS}, config: any, wallet: Wallet) {
 		this.#wallet = wallet

@@ -55,6 +55,7 @@ export class CDP {
 	mintable: boolean
 	#time: Date
 	#marketOpenParams: [number, number] // Time and block of last price update
+	hasLockedUST : boolean
 
 	constructor(
 		mirrorClient: Mirror,
@@ -74,6 +75,8 @@ export class CDP {
 		this.mintable = true // Nog aanpassen!
 		this.#marketOpenParams = [0, 0]
 		this.isShort = isShort
+		this.hasLockedUST = false
+
 	}
 
 	async updateCDPTokenInfo(): Promise<void> {
@@ -128,10 +131,10 @@ export class CDP {
 		const goalOCR = desiredOcrMargin.add(this.minCollateralRatio)
 		const collateralValue = new Decimal(this.collateralInfo.amount)
 			.times(this.collateralPrice)
-			.dividedBy(this.collateralMultiplier)
 			.dividedBy(MICRO_MULTIPLIER)
 		const lentValue = new Decimal(this.assetInfo.amount).times(this.assetPrice).dividedBy(MICRO_MULTIPLIER)
 		const currentOCR = collateralValue.dividedBy(lentValue)
+		console.log(currentOCR)
 		// Logger.log(`Need to transact ${lentValue.minus(collateralValue.dividedBy((goalOCR.minus(currentOCR)).plus(collateralValue.dividedBy(lentValue)))).dividedBy(this.assetPrice)} ${this.assetName}`)
 		return lentValue
 			.minus(collateralValue.dividedBy(goalOCR.minus(currentOCR).plus(collateralValue.dividedBy(lentValue))))
@@ -153,7 +156,7 @@ export class CDP {
 		this.assetInfo = cdp.asset
 		this.minCollateralRatio = parseFloat(
 			(await this.#mirrorClient.mint.getAssetConfig(this.assetInfo.info.token.contract_addr)).min_collateral_ratio
-		)
+		) * this.collateralMultiplier
 		// Logger.log(`The minimum collateral ration of asset ${this.assetName} at address ${(<Token> this.assetInfo.info ).token.contract_addr}  / ${this.assetAdress} is ${this.#minCollateralRatio}`)
 	}
 
@@ -181,10 +184,9 @@ export class CDP {
 	constructCollateralDepositMsg(neededUSTValue: Decimal): MsgExecuteContract {
 		const collateralAmount = neededUSTValue
 			.times(MICRO_MULTIPLIER)
-			.times(this.minCollateralRatio)
 			.dividedBy(this.collateralPrice)
 		console.log(`I need to repay ${neededUSTValue} UST by depositing ${collateralAmount} aUST`)
-		const collateralAsset: Asset<AssetInfo> = { info: this.collateralInfo.info, amount: collateralAmount.toString() }
+		const collateralAsset: Asset<AssetInfo> = { info: this.collateralInfo.info, amount: collateralAmount.toFixed(0) }
 		return this.#mirrorClient.mint.deposit(new Decimal(this.idx), collateralAsset)
 	}
 
@@ -263,6 +265,15 @@ export class CDP {
 	async setPremium(): Promise<void> {
 		this.premium = (new Decimal((await this.#mirrorClient.staking.getPoolInfo(this.#mirrorClient.assets[this.assetName].token.contractAddress as string)).premium_rate)).plus(1)
 	}
+
+	getLentValue(): Decimal{
+		return (new Decimal(this.assetInfo.amount).times(this.assetPrice)).dividedBy(MICRO_MULTIPLIER)
+	}
+
+	getCollateralValue(): Decimal{
+		return (new Decimal(this.collateralInfo.amount).times(this.collateralPrice)).dividedBy(MICRO_MULTIPLIER)
+	}
+
 	constructUndoFarmMsg(): MsgExecuteContract[] {
 		//Unstake, un
 	}
