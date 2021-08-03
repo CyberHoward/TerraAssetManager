@@ -34,6 +34,8 @@ export default {
 		borrow: 48,
 	},
 	denom: 'uusd',
+
+	// The LPs you want the bot to handle 
 	LPs: ['mTSLA', 'mABNB', 'mBTC'],
 
 	// Safety margin in percentage (liquidation LTV - max LTV) = 15%
@@ -46,8 +48,8 @@ export default {
 		borrow: 11.5,
 	},
 
-	// Max aUST/lentUST in %
-	// When this margin is exceeded half of the deposits are used to farm MIR.
+	// Max UST in anchor / lentUST in %
+	// When this margin is exceeded fractionToMirFarm% of the deposits are used to increase MIR farming.
 	maxDepositToLentRatio: 40,
 
 	fractionToMirFarm: 10,

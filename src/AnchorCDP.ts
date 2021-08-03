@@ -9,7 +9,6 @@ import {
 	Anchor,
 	MARKET_DENOMS,
 } from '@anchor-protocol/anchor.js'
-//import terra from "@terra-money/terra.js"
 const MICRO_MULTIPLIER = 1_000_000
 
 export class AnchorCDP {
