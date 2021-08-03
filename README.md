@@ -1,6 +1,6 @@
 # Anchor + Mirror yield optimizer bot
 
-> :attention: You will need to **use your private key** to let the bot create and sign transactions. Make shure your firewalls are configured accordingly. 
+> :attention: You will need to **use your private key** to let the bot create and sign transactions. Make shure your firewall is configured accordingly and your device is properly secured.  
 > **I decline all responsibility if you lose any money**. Using this bot is not riskless due to faulty configuration/bugs.
 
 This bot prevents Anchor liquidations while also using excess aUST and UST to apply a delta-neutral farming strategy on Mirror. 
