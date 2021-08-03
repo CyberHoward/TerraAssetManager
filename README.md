@@ -86,6 +86,8 @@ You can add fake money to your Testnet Wallet using https://faucet.terra.money/.
 
 <br />
 
-## Tips
+## Support
 
-If you want to send any tips, you can send them to `terra1gxsfv4ruvda37q3ta0kwx42w7qy5l9hf9l30sz`.
+If you liked this bot feel free to buy me or Romain a coffee:
+My address: `terra1gxsfv4ruvda37q3ta0kwx42w7qy5l9hf9l30sz`
+Romain: `terra17lkkhegetxqua7s7g7k3xr9hxzcpvf8p878cnl`
