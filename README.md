@@ -1,26 +1,53 @@
-# Anchor Borrow / Repay bot
+# Anchor + Mirror yield optimizer bot
 
-The main goal of this bot is to avoid being liquidated due to the price volatility of bLuna, by repaying part of your debt when the LTV is too high.
+> :attention: You will need to **use your private key** to let the bot create and sign transactions. Make shure your firewalls are configured accordingly. 
+> **I decline all responsibility if you lose any money**. Using this bot is not riskless due to faulty configuration/bugs.
 
-> :warning: You will need to **use your private key** to let the bot create and sign transactions.
-> We highly recommend to **create a dedicated wallet** and **we decline all responsibility if you lose any money**.
+This bot prevents Anchor liquidations while also using excess aUST and UST to apply a delta-neutral farming strategy on Mirror. 
+The CDPs of Anchor and Mirror are monitored and adjusted when needed. 
 
+This bot uses parts from an anchor bot implementation by Romain Lanz (https://github.com/RomainLanz/anchor-borrow-bot)
 <br />
 
-## How it Works?
+## How it works
 
-The bot will fetch your current LTV every X seconds (10 per default).
+The bot fetches all relevent data related to your active positions. 
+It uses this data to enshure solvency and maximize yield with the following priorities:
 
-If your LTV is higher than `ltv.limit` (43% per default), the bot will try to repay the sum needed to make your LTV back at `ltv.safe` (35% per default).
 
-1. We verify the balance of your wallet to see if you have enough money to repay;
-2. We verify the balance of your deposit to see if you can withdraw from it to repay;
-3. We verify if you have any unclaimed reward that we can claim and sell to repay;
-4. :construction: We verify if you have any token stake in governance that we can unstake and sell to repay ([#3](https://github.com/RomainLanz/anchor-borrow-bot/issues/)).
-
-> :information_source: If we need to claim any rewards, we will sell only the required amount and stake in governance the rest of your token.
-
-If your LTV is lower than `ltv.borrow` (30% per default) and the option is activated, the bot will borrow more to reach the `ltv.safe` (35% per default), then it will deposit the amount borrowed.
+1. Anchor loan
+  LTV higher then config.ltv.limit: Repayment needed
+    - Enough cash (UST) on hand? 
+    - Enough savings (aUST) on hand?
+    - Get UST from Mirror positions
+      - Unstake and withdraw needed LP from largest CDP asset (yields mAsset and UST) (1)
+      - Burn mAsset to short CDP (decreases CDP LTV) (1)
+      - Withdraw CDP collateral (aUST) to return CDP LTV to the same level as before. 
+      - Withdraw claimed aUST from Anchor and repay loan.
+  LTV lower then config.ltv.borrow: Borrow more
+    - Borrow UST and deposit to Anchor
+    
+    
+2. Mirror CDP
+  collateralization ratio determined using asset+collateral minimum collateralization ration and an added margin (config.mOCR)
+  Asset must be mintable (trading hours)
+  
+  Margin smaller then config.mORC.limit: Burn mAsset to CDP
+    - Enough LP staked to repay? (1)
+    - Enough mAssets in wallet? 
+    - Enough collateral (aUST)?
+    
+  Margin greater then config.mORC.borrow: Mint mAsset from CDP (taking premium into account)
+    - Mint and short mAsset
+    - Buy equal ammount of mAsset 
+    - Long farm mAsset
+    
+    
+3. Excess aUST available? 
+  - Deposit to CDP
+  - Mint and short mAsset
+  - Buy equal amount of mAsset
+  - Long farm mAsset
 
 <br />
 
@@ -44,65 +71,23 @@ Once you have `node` and `npm` accessible in your terminal's path, you will need
 
 ## Setup Telegram Bot
 
-This bot will notify you via a Telegram Bot for any transactions.
-
-You need to create your Telegram Bot to activate this feature. It can be quickly done [via the Telegram application](https://core.telegram.org/bots#6-botfather).
-Once you have your `token` and your `chat_id` you can define those variables inside the `.env` file.
-
-> :information_source: The `chat_id` is your user ID. You can have it when sending `/getid` to [IDBot](https://t.me/myidbot).
-
-You will also be able to control the bot via some commands.
-
-- `/ping` - Will answer you `Pong!`;
-- `/ltv` - Will give you your current LTV;
-- `/goto X` - Will repay or borrow to change your LTV according to X;
-- `/set X Y` - Will change runtime configuration (ie: `/set ltv.borrow 20`);
-- `/run` - Start the bot if it's paused;
-- `/pause` - Pause the bot, clear all caches and queues;
-- `/info` - Display current status and config;
-- `/compound` - Compound your rewards by selling them, swapping them to UST > Luna, bonding to bLuna and providing them.
-
-> :information_source: The `/compound` command has not been tested yet on the MAINNET, please, create an issue if you had any issue using it.
-
-### Changeable runtime settings (`/set`)
-
-| path                     | Description                                                     | Accept  |
-| ------------------------ | --------------------------------------------------------------- | ------- |
-| ltv.borrow               | At which LTV the bot should borrow more                         | Number  |
-| ltv.limit                | At which LTV the bot should repay                               | Number  |
-| ltv.safe                 | At which LTV the bot should go when borrowing or repaying       | Number  |
-| options.shouldBorrowMore | Define if the bot should borrow more when reaching `ltv.borrow` | Boolean |
-
-<br />
+TBA.
 
 ## Issues
 
-- If you have any issues with the bot, please, feel free to create one on this repository.
-- If the bot is stuck in `Already running, please retry later`, you can safely start it again by running `/pause` followed by `/run` (The bot should automatically restart if it's stuck).
+If you have any issues with the bot, please, feel free to create one on this repository.
 
 <br />
 
 ## Testing
 
-If you would like to try the bot before running in production, you may want to use the Terra Testnet.
+If you would like to try the bot before running in production, you may want to use the Terra Tequila Testnet.
 You can add fake money to your Testnet Wallet using https://faucet.terra.money/.
 
 <br />
 
-## Tips
+## Support
 
-If you want to send any tips, you can send them to `terra17lkkhegetxqua7s7g7k3xr9hxzcpvf8p878cnl`.
-
-## Changelogs
-
-### 0.2.6
-
-- **BREAKING** : Renamed `KEY` to `MNEMONIC` in `.env` file';
-- Added `/compound` command (ensure to copy `VALIDATOR_ADDRESS` from the `.env.example`);
-- Added `/run`;
-- Added `/pause`;
-- Added `/info`;
-- Added some safety for `/goto` and `/set`;
-- Verify environements variables at start;
-- Verify values when using `/set`;
-- Reboot the bot when it fails 5 times.
+If you liked this bot feel free to buy me or Romain a coffee:
+My address: `terra1gxsfv4ruvda37q3ta0kwx42w7qy5l9hf9l30sz`
+Romain: `terra17lkkhegetxqua7s7g7k3xr9hxzcpvf8p878cnl`
