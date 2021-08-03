@@ -214,7 +214,7 @@ export class Bot {
 		}
 		this.#cash = await this.getUSTBalance()
 		this.#savings = await this.#anchorCDP.getDeposit()
-		
+
 		if (this.#counter == 0) {
 			await this.setCDPs()
 			//await this.sleep(61000) // Wait at least 1 minute (oracle price update interval)
@@ -243,7 +243,10 @@ export class Bot {
 
 		for (const i in positions) {
 			for (const j in this.#mirror.assets) {
-				if (positions[i].asset.info.token.contract_addr === this.#mirror.assets[j].token.contractAddress && (this.#config.LPs as string[]).includes(j)) {
+				if (
+					positions[i].asset.info.token.contract_addr === this.#mirror.assets[j].token.contractAddress &&
+					(this.#config.LPs as string[]).includes(j)
+				) {
 					console.log(`Adding ${j} as CDP`)
 					const l = this.#CDPs.push(
 						new CDP(
@@ -303,7 +306,9 @@ export class Bot {
 		try {
 			const repayAmount = mCDP.getAssetAmountToCompensate(new Decimal(this.#config.mOCR.safe).dividedBy(100))
 			console.log(`Need to repay ${repayAmount} of ${mCDP.assetName}`)
-			const LPtoBurn = (await this.sufficientStaked(mCDP.assetAdress, repayAmount, mCDP.assetPrice)).floor()
+			const LPtoBurn = (
+				await this.sufficientStaked(mCDP.assetAdress, repayAmount, mCDP.assetPrice.times(mCDP.premium))
+			).floor()
 			const collateralBalance = await this.getTokenBalance(mCDP.collateralName)
 			const assetBalance = await this.getTokenBalance(mCDP.assetAdress)
 
@@ -360,11 +365,10 @@ export class Bot {
 		return new Decimal((await TSToken.getBalance(this.#wallet.key.accAddress)).balance)
 	}
 
-	async sufficientStaked(assetToken: string, mneeded: Decimal, oracleAssetPrice: Decimal): Promise<Decimal> {
+	async sufficientStaked(assetToken: string, mneeded: Decimal, onChainAssetPrice: Decimal): Promise<Decimal> {
 		try {
 			const pool = await this.#mirror.staking.getPoolInfo(assetToken)
 			const LPs = (await this.#mirror.staking.getRewardInfo(this.#wallet.key.accAddress, assetToken)).reward_infos
-			const assetPrice = oracleAssetPrice.times(new Decimal(1).plus(pool.premium_rate))
 			if (LPs) {
 				let LPStaked = new Decimal(0)
 				for (const i in LPs) {
@@ -375,7 +379,7 @@ export class Bot {
 				const totalLP = new Decimal(pool.total_bond_amount)
 				const LPToBurn = mneeded
 					.times(totalLP)
-					.dividedBy(totalLP.toPower(new Decimal(2)).dividedBy(assetPrice).sqrt())
+					.dividedBy(totalLP.toPower(new Decimal(2)).dividedBy(onChainAssetPrice).sqrt())
 					.times(MICRO_MULTIPLIER)
 				// console.log(`want to burn ${LPToBurn} and i have ${LPStaked}`)
 				if (LPToBurn.lessThanOrEqualTo(LPStaked)) {
@@ -505,39 +509,60 @@ export class Bot {
 	async withdrawMirrorCapital(neededUST: Decimal, channelName: ChannelName): Promise<CDP | undefined> {
 		console.log(`Need ${neededUST} UST to repay Anchor`)
 		const collateralValues = this.#CDPs.map((cdp) => {
-			return cdp.collateralPrice.times(new Decimal(cdp.collateralInfo.amount)).toNumber()
+			if (cdp.mintable) {
+				return cdp.collateralPrice.times(new Decimal(cdp.collateralInfo.amount)).toNumber()
+			} else {
+				return 0
+			}
 		})
 		if (collateralValues != undefined) {
 			const biggestCDPidx = collateralValues.indexOf(Math.max(...collateralValues))
 			const targetCDP = this.#CDPs[biggestCDPidx]
 			await targetCDP.updateAndGetRelativeOCR()
+			await targetCDP.updateCDPTokenInfo()
 			const lentValue = targetCDP.getLentValue()
 			const collateralValue = targetCDP.getCollateralValue()
 			const LTV = lentValue.dividedBy(collateralValue)
 			// CDP collateral + lentValue ~ total vault value since long farm UST ~ lent value
-			if (collateralValues[biggestCDPidx] + lentValue.toNumber() > neededUST.toNumber()) {
+			if (
+				collateralValues[biggestCDPidx] != 0 &&
+				collateralValues[biggestCDPidx] + lentValue.toNumber() > neededUST.toNumber()
+			) {
+				await targetCDP.setPremium()
 				const mAssetValueToBurn = LTV.times(neededUST.times(-1).plus(collateralValue))
 					.minus(lentValue)
 					.dividedBy(LTV.times(targetCDP.premium).plus(new Decimal(1)))
-					.times(-1.015) // 1.5% Burn fee
+					.times(-1) // 1.5% Burn fee is drawn from collateral when closing position
 				const mAssetToBurn = mAssetValueToBurn.dividedBy(targetCDP.assetPrice)
 
 				const collateralWithdrawValue = lentValue.plus(mAssetValueToBurn).dividedBy(LTV).minus(collateralValue)
 				const LPtoBurn = (
-					await this.sufficientStaked(targetCDP.assetAdress, mAssetToBurn, targetCDP.assetPrice)
+					await this.sufficientStaked(
+						targetCDP.assetAdress,
+						mAssetToBurn,
+						targetCDP.assetPrice.times(targetCDP.premium)
+					)
 				).floor()
 				console.log(
-					`Need to burn ${mAssetValueToBurn} worth of assets and withdraw ${collateralWithdrawValue} for a total of ${mAssetValueToBurn.plus(
-						collateralWithdrawValue
-					)}, or ${neededUST} to get UST.`
+					`Need to burn ${mAssetValueToBurn} worth of assets and withdraw ${collateralWithdrawValue} for a total of ${mAssetToBurn
+						.times(targetCDP.assetPrice.times(targetCDP.premium))
+						.plus(collateralWithdrawValue)}, or ${neededUST} to get UST.
+					With the the LP UST side being ${mAssetToBurn.times(targetCDP.assetPrice.times(targetCDP.premium))}.
+					This is done with LP ${LPtoBurn}`
 				)
 				this.toBroadcast(targetCDP.contructUnstakeMsg(LPtoBurn), channelName)
 				this.toBroadcast(targetCDP.constructUnbondMsg(LPtoBurn), channelName)
 				this.toBroadcast(await targetCDP.constructBurnMsg(mAssetToBurn), channelName)
 				this.toBroadcast(targetCDP.constructWithdrawMsg(collateralWithdrawValue), channelName)
-				this.toBroadcast(this.#anchorCDP.computeWithdrawMessage(collateralWithdrawValue), channelName)
+				//await this.broadcast(channelName)
+
+				this.toBroadcast(
+					this.#anchorCDP.computeWithdrawMessage(collateralWithdrawValue.dividedBy(targetCDP.collateralPrice)),
+					channelName
+				) //Dividing by collateral price should not be needed!
 				this.toBroadcast(this.#anchorCDP.computeRepayMessage(neededUST), channelName)
 				//await this.broadcast(channelName)
+
 				return targetCDP
 			}
 		}
@@ -563,10 +588,10 @@ export class Bot {
 
 	private async broadcast(channelName: ChannelName) {
 		try {
-			// console.log("Sending these transactions")
-			// for (const j in this.#txChannels[channelName]) {
-			// 	console.log(this.#txChannels[channelName][j])
-			// }
+			console.log('Sending these transactions')
+			for (const j in this.#txChannels[channelName]) {
+				console.log(this.#txChannels[channelName][j])
+			}
 
 			const tx = await this.#wallet.createAndSignTx({ msgs: this.#txChannels[channelName] })
 			await this.#client.tx.broadcast(tx)

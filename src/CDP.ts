@@ -230,7 +230,13 @@ export class CDP {
 		const tokenAddress = tokenAsset.info.token.contract_addr
 		const coins = new Coins([new Coin(denomAsset.info.native_token.denom, denomAsset.amount)])
 
-		console.log(`LPing ${amount} with a value of ${amount.times(this.assetPrice.times(this.premium))} together with ${LPUST} UST which gives a price of ${LPUST.dividedBy(amount)} and an on-chain price of ${this.assetPrice.times(this.premium)} which has a premium of ${this.premium}.`)
+		console.log(
+			`LPing ${amount} with a value of ${amount.times(
+				this.assetPrice.times(this.premium)
+			)} together with ${LPUST} UST which gives a price of ${LPUST.dividedBy(
+				amount
+			)} and an on-chain price of ${this.assetPrice.times(this.premium)} which has a premium of ${this.premium}.`
+		)
 		return [
 			new MsgExecuteContract(address, tokenAddress, {
 				// Increase contract allowance
@@ -265,14 +271,14 @@ export class CDP {
 	}
 
 	async setPremium(): Promise<void> {
-			const pair = new TerraswapPair({
-				contractAddress: this.#mirrorClient.assets[this.assetName].pair.contractAddress,
-				lcd: this.#mirrorClient.lcd,
-			})
-			const poolInfo = await pair.getPool()
-			const onChainPrice = (new Decimal(poolInfo.assets[0].amount)).dividedBy(new Decimal(poolInfo.assets[1].amount))
-			this.premium = ((onChainPrice.minus(this.assetPrice)).dividedBy(this.assetPrice)).plus(new Decimal(1))
-			console.log(this.premium)
+		const pair = new TerraswapPair({
+			contractAddress: this.#mirrorClient.assets[this.assetName].pair.contractAddress,
+			lcd: this.#mirrorClient.lcd,
+		})
+		const poolInfo = await pair.getPool()
+		const onChainPrice = new Decimal(poolInfo.assets[0].amount).dividedBy(new Decimal(poolInfo.assets[1].amount))
+		this.premium = onChainPrice.minus(this.assetPrice).dividedBy(this.assetPrice).plus(new Decimal(1))
+		console.log(this.premium)
 	}
 
 	constructWithdrawMsg(collateralWithdrawValue: Decimal): MsgExecuteContract {
