@@ -2,26 +2,16 @@ import { dset } from 'dset'
 import dedent from 'dedent-js'
 import Decimal from 'decimal.js'
 import {
-	Coin,
-	Coins,
-	Dec,
 	Denom,
 	LCDClient,
-	LocalTerra,
 	MnemonicKey,
 	Msg,
-	MsgExecuteContract,
-	MsgSwap,
-	StdFee,
 	Wallet,
 } from '@terra-money/terra.js'
 import {
 	AddressProviderFromJson,
 	Anchor,
-	COLLATERAL_DENOMS,
 	columbus4,
-	fabricateTerraswapProvideLiquidityANC,
-	fabricateTerraswapProvideLiquiditybLuna,
 	MARKET_DENOMS,
 	tequila0004,
 } from '@anchor-protocol/anchor.js'
@@ -29,16 +19,7 @@ import {
 	DEFAULT_TEQUILA_MIRROR_OPTIONS,
 	DEFAULT_MIRROR_OPTIONS,
 	Mirror,
-	AssetInfo,
-	Token,
-	Asset,
-	MirrorMint,
-	AssetOptions,
-	isNativeToken,
 	TerraswapToken,
-	NativeToken,
-	TerraswapPair,
-	MirrorStaking,
 } from '@mirror-protocol/mirror.js'
 import { Logger } from './Logger'
 import { CDP } from './CDP'

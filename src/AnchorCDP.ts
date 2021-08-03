@@ -1,32 +1,14 @@
-import { dset } from 'dset'
 
 import Decimal from 'decimal.js'
 import {
 	BlockTxBroadcastResult,
-	Coin,
-	Coins,
-	Denom,
-	LCDClient,
-	LocalTerra,
-	MnemonicKey,
 	Msg,
-	MsgExecuteContract,
-	MsgSwap,
-	StdFee,
 	Wallet,
 } from '@terra-money/terra.js'
 import {
-	AddressProviderFromJson,
 	Anchor,
-	COLLATERAL_DENOMS,
-	columbus4,
-	fabricateTerraswapProvideLiquidityANC,
-	fabricateTerraswapProvideLiquiditybLuna,
 	MARKET_DENOMS,
-	tequila0004,
 } from '@anchor-protocol/anchor.js'
-import { Logger } from './Logger'
-import { CDP } from './CDP'
 //import terra from "@terra-money/terra.js"
 const MICRO_MULTIPLIER = 1_000_000
 
