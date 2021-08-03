@@ -114,8 +114,7 @@ export class Bot {
 			this.#wallet
 		)
 
-		Logger.log(dedent`<b>v0.2.6 - Anchor Borrow / Repay Bot</b>
-				Made by Romain Lanz
+		Logger.log(dedent`<b>v0.1 - Terra Yield Farming Bot</b>
 				
 				<b>Network:</b> <code>${this.#config.chainId === 'columbus-4' ? 'Mainnet' : 'Testnet'}</code>
 				<b>Address:</b>
@@ -215,19 +214,7 @@ export class Bot {
 		}
 		this.#cash = await this.getUSTBalance()
 		this.#savings = await this.#anchorCDP.getDeposit()
-		// Logger.log('Account has ' + this.#balance + 'UST.')
-
-		/*
-		if (this.#balance.greaterThan(new Decimal(1000))){
-			this.toBroadcast(this.computeDepositMessage(new Decimal(1000)), channelName)
-			Logger.log("Deposited 100 UST")
-			await this.broadcast(channelName)
-			Logger.toBroadcast('Testing', channelName)
-		}
-		*/
-
-		//console.log(await this.#mirror.collaterallOracle.getCollateralAssetInfos())
-		//console.log(this.#wallet)
+		
 		if (this.#counter == 0) {
 			await this.setCDPs()
 			//await this.sleep(61000) // Wait at least 1 minute (oracle price update interval)
@@ -256,7 +243,8 @@ export class Bot {
 
 		for (const i in positions) {
 			for (const j in this.#mirror.assets) {
-				if (positions[i].asset.info.token.contract_addr === this.#mirror.assets[j].token.contractAddress) {
+				if (positions[i].asset.info.token.contract_addr === this.#mirror.assets[j].token.contractAddress && (this.#config.LPs as string[]).includes(j)) {
+					console.log(`Adding ${j} as CDP`)
 					const l = this.#CDPs.push(
 						new CDP(
 							this.#mirror,
@@ -269,6 +257,7 @@ export class Bot {
 					)
 					await this.#CDPs[l - 1].updateOpenMarketParam()
 					await this.#CDPs[l - 1].updateCDPTokenInfo()
+					await this.#CDPs[l - 1].updateAndGetRelativeOCR()
 					await this.#CDPs[l - 1].setPremium()
 				}
 			}
@@ -405,14 +394,14 @@ export class Bot {
 	}
 
 	async shortMore(mCDP: CDP, channelName: ChannelName): Promise<void> {
+		await mCDP.setPremium()
 		const shortAmount = mCDP.getAssetAmountToCompensate(new Decimal(this.#config.mOCR.safe).dividedBy(100)).abs()
 		const neededSwapUST = (await mCDP.getOnchainReverseSim(shortAmount)).dividedBy(MICRO_MULTIPLIER) // How much UST do i need to buy the masset
-		const neededLPUST = shortAmount.times(mCDP.assetPrice.times(mCDP.premium))
+		const neededLPUST = shortAmount.times(mCDP.assetPrice).times(mCDP.premium)
 		const neededUST = neededLPUST.plus(neededSwapUST)
-		console.log(`Lending and shorting more. I need ${neededUST} UST in total for the swap and LP'ing`)
+		console.log(`Lending and shorting ${shortAmount} more. I need ${neededUST} UST in total for the swap and LP'ing`)
 		if (mCDP.mintable && (this.#cash.greaterThan(neededUST) || this.#savings.greaterThan(neededUST))) {
 			// Need enough UST to buy and stake (x2) + some reserve for fees
-
 			if (!this.#cash.greaterThan(neededUST)) {
 				this.toBroadcast(this.#anchorCDP.computeWithdrawMessage(neededUST), channelName)
 			}
@@ -575,9 +564,9 @@ export class Bot {
 	private async broadcast(channelName: ChannelName) {
 		try {
 			// console.log("Sending these transactions")
-			for (const j in this.#txChannels[channelName]) {
-				console.log(this.#txChannels[channelName][j])
-			}
+			// for (const j in this.#txChannels[channelName]) {
+			// 	console.log(this.#txChannels[channelName][j])
+			// }
 
 			const tx = await this.#wallet.createAndSignTx({ msgs: this.#txChannels[channelName] })
 			await this.#client.tx.broadcast(tx)
