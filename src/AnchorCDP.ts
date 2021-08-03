@@ -31,15 +31,14 @@ import { CDP } from './CDP'
 const MICRO_MULTIPLIER = 1_000_000
 
 export class AnchorCDP {
-	#denom: {address: string,market: MARKET_DENOMS}
+	#denom: { address: string; market: MARKET_DENOMS }
 	#config: any
 	#anchor: Anchor
 	#wallet: Wallet
 	LTV: Decimal
 	lentValue: Decimal
-	
 
-	constructor(anchor: Anchor, denom: {address: string,market: MARKET_DENOMS}, config: any, wallet: Wallet) {
+	constructor(anchor: Anchor, denom: { address: string; market: MARKET_DENOMS }, config: any, wallet: Wallet) {
 		this.#wallet = wallet
 		this.#anchor = anchor
 		this.#denom = denom

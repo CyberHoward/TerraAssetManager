@@ -33,24 +33,24 @@ export default {
 		// This define the low-limit when the bot will borrow more.
 		borrow: 48,
 	},
-	denom: "uusd",
+	denom: 'uusd',
 	LPs: ['mTSLA', 'mABNB', 'mBTC'],
 
 	// Safety margin in percentage (liquidation LTV - max LTV) = 15%
 	// example, TSLA mint is liquidated when LTV > 50% so with a 15% margin the script will repay some TSLA at 35% LTV
 	mOCR: {
-		limit: 10.8,
+		limit: 10.5,
 
 		safe: 11,
 
-		borrow: 11.2,
+		borrow: 11.5,
 	},
 
-	// Max aUST/lentUST in % 
-	// When this margin is exceeded half of the deposits are used to farm MIR. 
-	maxDepositToLentRatio: 40, 
+	// Max aUST/lentUST in %
+	// When this margin is exceeded half of the deposits are used to farm MIR.
+	maxDepositToLentRatio: 40,
 
-	fractionToMirFarm: 20,
+	fractionToMirFarm: 10,
 
 	notification: {
 		tty: true,

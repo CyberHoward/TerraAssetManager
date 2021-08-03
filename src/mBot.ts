@@ -61,7 +61,7 @@ type BotStatus = 'IDLE' | 'RUNNING' | 'PAUSE'
 
 export class Bot {
 	#failureCount = 0
-	#walletDenom: {address: string, market: MARKET_DENOMS}
+	#walletDenom: { address: string; market: MARKET_DENOMS }
 	#config: Record<string, any>
 	#client: LCDClient
 	#anchorCDP: AnchorCDP
@@ -231,9 +231,8 @@ export class Bot {
 		if (this.#counter == 0) {
 			await this.setCDPs()
 			//await this.sleep(61000) // Wait at least 1 minute (oracle price update interval)
-		} else if (this.#counter % 5 == 0){
-			
-			//Check if there are claimable rewards and short positions. 
+		} else if (this.#counter % 5 == 0) {
+			//Check if there are claimable rewards and short positions.
 		}
 
 		await this.updateCDPs(channelName)
@@ -280,44 +279,17 @@ export class Bot {
 
 	//Check CDP OCR and correct if needed
 	async updateCDPs(channelName: ChannelName): Promise<void> {
-		// How is Anchor loan doing? 
+		// How is Anchor loan doing?
 		await this.#anchorCDP.setLTV()
+		await this.maintainAnchorCDP(channelName)
 		console.log(`Anchor LTV is ${this.#anchorCDP.LTV}%`)
-		if((this.#anchorCDP.LTV).greaterThan(this.#config.ltv.limit)){
-			const toRepay = await this.#anchorCDP.computeAmountToRepay()
-			if(this.#cash.greaterThan(toRepay.plus(10))){ // Keep a little buffer for fees
-				// Repay with cash 
-				this.toBroadcast(this.#anchorCDP.computeRepayMessage(toRepay), channelName)
-				console.log(`Repaying Anchor with cash reserves`)
-				
-			} else if (this.#savings.greaterThan(toRepay)){
-				// Repay with deposits
-				this.toBroadcast(this.#anchorCDP.computeWithdrawMessage(toRepay), channelName)
-				this.toBroadcast(this.#anchorCDP.computeRepayMessage(toRepay), channelName)
-				console.log(`Repaying Anchor with Anchor Deposits`)
-			} else {
-				//Try free up capital from Mirror farms
-				this.withdrawMirrorCapital(toRepay)
 
-				console.log(`Repaying Anchor with UST from Mirror farms`)
-			}
-			console.log(`Broadcasting Anchor repayment transactions`)
-			await this.broadcast(channelName)
-		} else if ((this.#anchorCDP.LTV).lessThan(this.#config.ltv.borrow)){
-			const toBorrow = await this.#anchorCDP.computeAmountToBorrow()
-			console.log('you can borrow more againt your luna')
-			this.toBroadcast(this.#anchorCDP.computeBorrowMessage(toBorrow), channelName)
-			this.toBroadcast(this.#anchorCDP.computeDepositMessage(toBorrow), channelName)
-			console.log(`Broadcasting Anchor borrow and deposit transactions`)
-			await this.broadcast(channelName)
-		}
-
-		// How are CDP's doing? 
+		// How are Mirror CDPs doing?
 		for (const i in this.#CDPs) {
 			const OCRmargin = (await this.#CDPs[i].updateAndGetRelativeOCR()) as Decimal
 			console.log('OCR margin is: ' + OCRmargin)
 
-			await this.#CDPs[i].updateCDPTokenInfo() // Remove 
+			await this.#CDPs[i].updateCDPTokenInfo() // Remove
 
 			if (OCRmargin.lessThan(new Decimal(this.#config.mOCR.limit).dividedBy(100))) {
 				await this.tryRepay(this.#CDPs[i], channelName)
@@ -325,48 +297,17 @@ export class Bot {
 				console.log()
 				await this.shortMore(this.#CDPs[i], channelName)
 			}
-
-			//See if locked funds from shorting can be claimed
-			// if((this.#counter > ((86400)/this.#config.options.waitFor)) || this.#counter == 0){
-			// 	await this.#CDPs[i].tryClaimLockedFunds()
-			// 	this.#counter = 1
-			// }
 		}
 
-		// How much deposits do I have? 
-		if (this.#savings.dividedBy(this.#anchorCDP.lentValue).greaterThan(new Decimal(this.#config.maxDepositToLentRatio).dividedBy(100))){
-			// Use half of deposits to increase MIR farm
-			// What pool? 
-			
-			const someCDP = this.#CDPs.find(cdp => cdp.mintable && cdp.isShort && !cdp.hasLockedUST)
-			const usableCredit = this.#savings.times(new Decimal(this.#config.fractionToMirFarm/100))
-			if(someCDP != undefined){
-				someCDP.setPremium()
-				someCDP.updateCDPTokenInfo()
-				console.log(`Asset has a premium of ${someCDP.premium}`)
-
-				const lentValue = someCDP.getLentValue()
-				const collateralValue = someCDP.getCollateralValue()
-				const CDPLTV = lentValue.dividedBy(collateralValue)
-
-				const shortValue = ((CDPLTV.times(usableCredit.plus(collateralValue))).minus(lentValue)).dividedBy((new Decimal(2).times(someCDP.premium.times(CDPLTV)).plus(new Decimal(1))))
-				console.log(`shortvalue of ${shortValue}`)
-				const neededaUST = ((lentValue.plus(shortValue)).dividedBy(CDPLTV)).minus(collateralValue)	//((usableCredit.plus(lentValue)).minus(someCDP.premium.times(CDPLTV).times(2).times(collateralValue))).dividedBy(new Decimal(1).plus(someCDP.premium.times(2).times(CDPLTV)))
-				const neededUST = shortValue.times(new Decimal(2).times(someCDP.premium))
-				console.log(`credit of ${usableCredit} aUST/UST ${neededaUST}, ${neededUST} totaling ${neededUST.plus(neededaUST)}`)
-				this.toBroadcast(this.#anchorCDP.computeWithdrawMessage(neededUST), channelName)
-
-				console.log(`Usable credit of ${usableCredit}, Lent value of ${lentValue} and collateral value of ${collateralValue} which results in a LTV of ${CDPLTV} with a needed aUST and UST of ${neededaUST}, ${neededUST} and a collateral price of ${someCDP.collateralPrice}`)
-				this.toBroadcast(someCDP.constructCollateralDepositMsg(neededaUST), channelName)
-				this.toBroadcast(someCDP.constructMintMsg(shortValue.dividedBy(someCDP.assetPrice) ), channelName)
-				this.toBroadcast(this.#anchorCDP.computeWithdrawMessage(neededUST), channelName)
-				this.toBroadcast(someCDP.constructBuyAndLPMsg(shortValue.dividedBy(someCDP.assetPrice),neededUST.dividedBy(2)), channelName)
-				
-				
-				this.broadcast(channelName)
-			}
+		// Enough deposits to farm on Mirror?
+		if (
+			this.#savings
+				.dividedBy(this.#anchorCDP.lentValue)
+				.greaterThan(new Decimal(this.#config.maxDepositToLentRatio).dividedBy(100))
+		) {
+			// Use fractionToMirFarm of deposits to increase MIR farm
+			await this.useDepositsToFarm(channelName)
 		}
-
 	}
 
 	async tryRepay(mCDP: CDP, channelName: ChannelName): Promise<void> {
@@ -464,20 +405,154 @@ export class Bot {
 	}
 
 	async shortMore(mCDP: CDP, channelName: ChannelName): Promise<void> {
-		console.log("shorting more ")
 		const shortAmount = mCDP.getAssetAmountToCompensate(new Decimal(this.#config.mOCR.safe).dividedBy(100)).abs()
-		const neededUST = (await mCDP.getOnchainReverseSim(shortAmount)).dividedBy(MICRO_MULTIPLIER) // How much UST do i need to buy the masset
-		console.log(`shorting ${shortAmount}`)
-		if (mCDP.mintable && (this.#cash.greaterThan(neededUST.times(2.1)) || this.#savings.greaterThan(neededUST.times(2.1)))) { // Need enough UST to buy and stake (x2) + some reserve for fees
-			
-			if(!this.#cash.greaterThan(neededUST.times(2.1))){
+		const neededSwapUST = (await mCDP.getOnchainReverseSim(shortAmount)).dividedBy(MICRO_MULTIPLIER) // How much UST do i need to buy the masset
+		const neededLPUST = shortAmount.times(mCDP.assetPrice.times(mCDP.premium))
+		const neededUST = neededLPUST.plus(neededSwapUST)
+		console.log(`Lending and shorting more. I need ${neededUST} UST in total for the swap and LP'ing`)
+		if (mCDP.mintable && (this.#cash.greaterThan(neededUST) || this.#savings.greaterThan(neededUST))) {
+			// Need enough UST to buy and stake (x2) + some reserve for fees
+
+			if (!this.#cash.greaterThan(neededUST)) {
 				this.toBroadcast(this.#anchorCDP.computeWithdrawMessage(neededUST), channelName)
 			}
 			this.toBroadcast(mCDP.constructMintMsg(shortAmount), channelName)
-			this.toBroadcast(mCDP.constructBuyAndLPMsg(shortAmount, neededUST), channelName) //Stake if enough ust in wallet
+			this.toBroadcast(mCDP.constructBuyAndLPMsg(shortAmount, neededSwapUST, neededLPUST), channelName) //Stake if enough ust in wallet
 			await this.broadcast(channelName)
 			await mCDP.updateCDPTokenInfo()
 		}
+	}
+
+	async getLunaBalance(): Promise<Decimal> {
+		const coins = await this.#client.bank.balance(this.#wallet.key.accAddress)
+		const lunaCoin = coins.get(Denom.LUNA)
+
+		if (!lunaCoin) {
+			return new Decimal(0)
+		}
+
+		return lunaCoin.amount.dividedBy(MICRO_MULTIPLIER)
+	}
+
+	async maintainAnchorCDP(channelName: ChannelName): Promise<void> {
+		if (this.#anchorCDP.LTV.greaterThan(this.#config.ltv.limit)) {
+			const toRepay = await this.#anchorCDP.computeAmountToRepay()
+
+			if (this.#cash.greaterThan(toRepay.plus(10))) {
+				// Keep a little buffer for fees
+				// Repay with cash
+
+				this.toBroadcast(this.#anchorCDP.computeRepayMessage(toRepay), channelName)
+				console.log(`Repaying Anchor with cash reserves`)
+			} else if (this.#savings.greaterThan(toRepay)) {
+				// Repay with deposits
+
+				this.toBroadcast(this.#anchorCDP.computeWithdrawMessage(toRepay), channelName)
+				this.toBroadcast(this.#anchorCDP.computeRepayMessage(toRepay), channelName)
+				console.log(`Repaying Anchor with Anchor Deposits`)
+			} else {
+				//Try free up capital from Mirror farms
+				console.log(`Repaying Anchor with UST from Mirror farms`)
+				const cdp = await this.withdrawMirrorCapital(toRepay, channelName)
+				if (cdp != undefined) {
+					cdp.updateCDPTokenInfo()
+				}
+			}
+			console.log(`Broadcasting transactions`)
+			await this.broadcast(channelName)
+		} else if (this.#anchorCDP.LTV.lessThan(this.#config.ltv.borrow)) {
+			const toBorrow = await this.#anchorCDP.computeAmountToBorrow()
+			console.log('you can borrow more againt your luna')
+			this.toBroadcast(this.#anchorCDP.computeBorrowMessage(toBorrow), channelName)
+			this.toBroadcast(this.#anchorCDP.computeDepositMessage(toBorrow), channelName)
+			console.log(`Broadcasting Anchor borrow and deposit transactions`)
+			await this.broadcast(channelName)
+		}
+	}
+
+	async useDepositsToFarm(channelName: ChannelName): Promise<void> {
+		console.log('We can use aUST for mir farm')
+		const someCDP = this.#CDPs.find((cdp) => cdp.mintable && cdp.isShort && !cdp.hasLockedUST)
+		const usableCredit = new Decimal(this.#config.fractionToMirFarm / 100)
+			.plus(
+				this.#savings
+					.dividedBy(this.#anchorCDP.lentValue)
+					.minus(new Decimal(this.#config.maxDepositToLentRatio).dividedBy(100))
+			)
+			.times(this.#anchorCDP.lentValue)
+		if (someCDP != undefined) {
+			await someCDP.setPremium()
+			await someCDP.updateCDPTokenInfo()
+			console.log(`Asset has a premium of ${someCDP.premium}`)
+
+			const lentValue = someCDP.getLentValue()
+			const collateralValue = someCDP.getCollateralValue()
+			const CDPLTV = lentValue.dividedBy(collateralValue)
+
+			const shortValue = CDPLTV.times(usableCredit.plus(collateralValue))
+				.minus(lentValue)
+				.dividedBy(new Decimal(2).times(someCDP.premium.times(CDPLTV)).plus(new Decimal(1)))
+			console.log(`I will short massets worth ${shortValue}`)
+			const neededaUST = lentValue.plus(shortValue).dividedBy(CDPLTV).minus(collateralValue) //((usableCredit.plus(lentValue)).minus(someCDP.premium.times(CDPLTV).times(2).times(collateralValue))).dividedBy(new Decimal(1).plus(someCDP.premium.times(2).times(CDPLTV)))
+			const neededUST = shortValue.times(new Decimal(2).times(someCDP.premium)).times(1.005) //accounting for fees
+			console.log(
+				`credit of ${usableCredit.toFixed(0)} aUST/UST ${neededaUST.toFixed(0)}, ${neededUST.toFixed(
+					0
+				)} totaling ${neededUST.plus(neededaUST).toFixed(0)}`
+			)
+
+			//console.log(`Usable credit of ${usableCredit}, Lent value of ${lentValue} and collateral value of ${collateralValue} which results in a LTV of ${CDPLTV} with a needed aUST and UST of ${neededaUST}, ${neededUST} and a collateral price of ${someCDP.collateralPrice}`)
+			this.toBroadcast(someCDP.constructCollateralDepositMsg(neededaUST), channelName)
+			this.toBroadcast(this.#anchorCDP.computeWithdrawMessage(neededUST), channelName)
+			await this.broadcast(channelName)
+			await someCDP.updateCDPTokenInfo()
+			this.#cash = await this.getUSTBalance()
+			this.#savings = await this.#anchorCDP.getDeposit()
+			console.log('aUST is deposited and UST is made available for farming, now you can short more. ')
+			await this.shortMore(someCDP, channelName)
+		}
+	}
+
+	async withdrawMirrorCapital(neededUST: Decimal, channelName: ChannelName): Promise<CDP | undefined> {
+		console.log(`Need ${neededUST} UST to repay Anchor`)
+		const collateralValues = this.#CDPs.map((cdp) => {
+			return cdp.collateralPrice.times(new Decimal(cdp.collateralInfo.amount)).toNumber()
+		})
+		if (collateralValues != undefined) {
+			const biggestCDPidx = collateralValues.indexOf(Math.max(...collateralValues))
+			const targetCDP = this.#CDPs[biggestCDPidx]
+			await targetCDP.updateAndGetRelativeOCR()
+			const lentValue = targetCDP.getLentValue()
+			const collateralValue = targetCDP.getCollateralValue()
+			const LTV = lentValue.dividedBy(collateralValue)
+			// CDP collateral + lentValue ~ total vault value since long farm UST ~ lent value
+			if (collateralValues[biggestCDPidx] + lentValue.toNumber() > neededUST.toNumber()) {
+				const mAssetValueToBurn = LTV.times(neededUST.times(-1).plus(collateralValue))
+					.minus(lentValue)
+					.dividedBy(LTV.times(targetCDP.premium).plus(new Decimal(1)))
+					.times(-1.015) // 1.5% Burn fee
+				const mAssetToBurn = mAssetValueToBurn.dividedBy(targetCDP.assetPrice)
+
+				const collateralWithdrawValue = lentValue.plus(mAssetValueToBurn).dividedBy(LTV).minus(collateralValue)
+				const LPtoBurn = (
+					await this.sufficientStaked(targetCDP.assetAdress, mAssetToBurn, targetCDP.assetPrice)
+				).floor()
+				console.log(
+					`Need to burn ${mAssetValueToBurn} worth of assets and withdraw ${collateralWithdrawValue} for a total of ${mAssetValueToBurn.plus(
+						collateralWithdrawValue
+					)}, or ${neededUST} to get UST.`
+				)
+				this.toBroadcast(targetCDP.contructUnstakeMsg(LPtoBurn), channelName)
+				this.toBroadcast(targetCDP.constructUnbondMsg(LPtoBurn), channelName)
+				this.toBroadcast(await targetCDP.constructBurnMsg(mAssetToBurn), channelName)
+				this.toBroadcast(targetCDP.constructWithdrawMsg(collateralWithdrawValue), channelName)
+				this.toBroadcast(this.#anchorCDP.computeWithdrawMessage(collateralWithdrawValue), channelName)
+				this.toBroadcast(this.#anchorCDP.computeRepayMessage(neededUST), channelName)
+				//await this.broadcast(channelName)
+				return targetCDP
+			}
+		}
+		return undefined
 	}
 
 	stopExecution(): void {
@@ -512,42 +587,6 @@ export class Bot {
 			this.#txChannels[channelName] = []
 		}
 	}
-
-	async getLunaBalance(): Promise<Decimal> {
-		const coins = await this.#client.bank.balance(this.#wallet.key.accAddress)
-		const lunaCoin = coins.get(Denom.LUNA)
-
-		if (!lunaCoin) {
-			return new Decimal(0)
-		}
-
-		return lunaCoin.amount.dividedBy(MICRO_MULTIPLIER)
-	}
-
-	async withdrawMirrorCapital(neededUST: Decimal): Promise<void> {
-		const collateralValues = this.#CDPs.map(cdp => {return (cdp.collateralPrice.times(new Decimal(cdp.collateralInfo.amount)).toNumber())})
-		if (collateralValues != undefined){
-			const biggestCDPidx = collateralValues.indexOf(Math.max(...collateralValues))
-			if(collateralValues[biggestCDPidx] > neededUST.toNumber()){
-				const targetCDP = this.#CDPs[biggestCDPidx]
-				const LTV = await targetCDP.updateAndGetRelativeOCR() as Decimal 
-				const lentValue = targetCDP.getLentValue()
-				const collateralValue = targetCDP.getCollateralValue()
-				await targetCDP.setPremium()
-
-				const mAssetValueToBurn = (LTV.times(neededUST.plus(collateralValue)).minus(lentValue)).dividedBy((LTV.times(targetCDP.premium).plus(new Decimal(1))))
-				console.log(`Need to burn ${mAssetValueToBurn} worth of assets to repay loan.`)
-				const collateralWithdrawValue = lentValue.plus(s)
-
-				const LPtoBurn = (await this.sufficientStaked(targetCDP.assetAdress, mAssetValueToBurn.dividedBy(targetCDP.assetPrice), targetCDP.assetPrice)).floor()
-				this.toBroadcast(mCDP.contructUnstakeMsg(LPtoBurn), channelName)
-				this.toBroadcast(mCDP.constructUnbondMsg(LPtoBurn), channelName)
-				this.toBroadcast(await mCDP.constructBurnMsg(repayAmount), channelName)
-				
-			}
-		}
-	}
-
 
 	/*
 	computeOpenPositionMessage(camount: Decimal, asset_name: string, margin = this.#config.mOCR.limit){
@@ -598,3 +637,16 @@ export class Bot {
 		return new Promise((resolve) => setTimeout(resolve, ms))
 	}
 }
+
+// const shortValue = ((CDPLTV.times(usableCredit.plus(collateralValue))).minus(lentValue)).dividedBy((new Decimal(2).times(someCDP.premium.times(CDPLTV)).plus(new Decimal(1))))
+// 				const amountMinted = shortValue.dividedBy(someCDP.assetPrice)
+// 				console.log(`shortvalue of ${shortValue}`)
+// 				const neededaUST = ((lentValue.plus(shortValue)).dividedBy(CDPLTV)).minus(collateralValue)	//((usableCredit.plus(lentValue)).minus(someCDP.premium.times(CDPLTV).times(2).times(collateralValue))).dividedBy(new Decimal(1).plus(someCDP.premium.times(2).times(CDPLTV)))
+// 				const neededUST = shortValue.times(new Decimal(2).times(someCDP.premium))
+// 				console.log(`credit of ${usableCredit} aUST/UST ${neededaUST}, ${neededUST} totaling ${neededUST.plus(neededaUST)}`)
+
+// 				console.log(`Usable credit of ${usableCredit}, Lent value of ${lentValue} and collateral value of ${collateralValue} which results in a LTV of ${CDPLTV} with a needed aUST and UST of ${neededaUST}, ${neededUST} and a collateral price of ${someCDP.collateralPrice}`)
+// 				this.toBroadcast(someCDP.constructCollateralDepositMsg(neededaUST), channelName)
+// 				this.toBroadcast(someCDP.constructMintMsg(shortValue.dividedBy(someCDP.assetPrice) ), channelName)
+// 				this.toBroadcast(this.#anchorCDP.computeWithdrawMessage(neededUST), channelName)
+// 				this.toBroadcast(someCDP.constructBuyAndLPMsg((shortValue.times(someCDP.premium).dividedBy(someCDP.assetPrice)),neededUST.dividedBy(2)), channelName)
