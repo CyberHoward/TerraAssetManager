@@ -25,27 +25,27 @@ export default {
 
 	ltv: {
 		// This define the limit when the bot will repay your debt.
-		limit: 50,
+		limit: 55,
 
 		// This define the safe-limit that the bot will reach when repaying or borrowing more.
-		safe: 49,
+		safe: 50,
 
 		// This define the low-limit when the bot will borrow more.
-		borrow: 48,
+		borrow: 45,
 	},
 	denom: 'uusd',
 
-	// The LPs you want the bot to handle 
+	// The LPs you want the bot to handle
 	LPs: ['mTSLA', 'mABNB', 'mCOIN'],
 
 	// Safety margin in percentage (liquidation LTV - max LTV) = 15%
 	// example, TSLA mint is liquidated when LTV > 50% so with a 15% margin the script will repay some TSLA at 35% LTV
 	mOCR: {
-		limit: 10.5,
+		limit: 5,
 
-		safe: 11,
+		safe: 7,
 
-		borrow: 11.5,
+		borrow: 70,
 	},
 
 	// Max UST in anchor / lentUST in %

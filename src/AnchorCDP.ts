@@ -1,15 +1,9 @@
+/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import Decimal from 'decimal.js'
-import {
-	BlockTxBroadcastResult,
-	Msg,
-	Wallet,
-} from '@terra-money/terra.js'
-import {
-	Anchor,
-	MARKET_DENOMS,
-} from '@anchor-protocol/anchor.js'
-const MICRO_MULTIPLIER = 1_000_000
+import { BlockTxBroadcastResult, Msg, Wallet } from '@terra-money/terra.js'
+import { Anchor, MARKET_DENOMS } from '@anchor-protocol/anchor.js'
 
 export class AnchorCDP {
 	#denom: { address: string; market: MARKET_DENOMS }

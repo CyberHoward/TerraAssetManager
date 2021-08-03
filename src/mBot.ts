@@ -1,20 +1,10 @@
+/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { dset } from 'dset'
 import dedent from 'dedent-js'
 import Decimal from 'decimal.js'
-import {
-	Denom,
-	LCDClient,
-	MnemonicKey,
-	Msg,
-	Wallet,
-} from '@terra-money/terra.js'
-import {
-	AddressProviderFromJson,
-	Anchor,
-	columbus4,
-	MARKET_DENOMS,
-	tequila0004,
-} from '@anchor-protocol/anchor.js'
+import { Denom, LCDClient, MnemonicKey, Msg, Wallet } from '@terra-money/terra.js'
+import { AddressProviderFromJson, Anchor, columbus4, MARKET_DENOMS, tequila0004 } from '@anchor-protocol/anchor.js'
 import {
 	DEFAULT_TEQUILA_MIRROR_OPTIONS,
 	DEFAULT_MIRROR_OPTIONS,
@@ -71,7 +61,7 @@ export class Bot {
 		const miroptions = this.#config.chainId === 'columbus-4' ? DEFAULT_MIRROR_OPTIONS : DEFAULT_TEQUILA_MIRROR_OPTIONS
 		miroptions.lcd = this.#client
 		miroptions.key = key
-		miroptions.collateralOracle = 'terra1q3ls6u2glsazdeu7dxggk8d04elnvmsg0ung6n'
+
 		this.#mirror = new Mirror(miroptions)
 
 		this.#cash = new Decimal(0)
@@ -193,8 +183,6 @@ export class Bot {
 			this.#failureCount++
 			return
 		}
-		this.#cash = await this.getUSTBalance()
-		this.#savings = await this.#anchorCDP.getDeposit()
 
 		if (this.#counter == 0) {
 			await this.setCDPs()
@@ -203,8 +191,14 @@ export class Bot {
 			//Check if there are claimable rewards and short positions.
 		}
 
+		await this.updateBalances()
 		await this.updateCDPs(channelName)
 		this.#counter++
+	}
+
+	async updateBalances(): Promise<void> {
+		this.#cash = await this.getUSTBalance()
+		this.#savings = await this.#anchorCDP.getDeposit()
 	}
 
 	async getUSTBalance(): Promise<Decimal> {
@@ -262,13 +256,14 @@ export class Bot {
 			const OCRmargin = (await this.#CDPs[i].updateAndGetRelativeOCR()) as Decimal
 			console.log('OCR margin is: ' + OCRmargin)
 
-			await this.#CDPs[i].updateCDPTokenInfo() // Remove
-
 			if (OCRmargin.lessThan(new Decimal(this.#config.mOCR.limit).dividedBy(100))) {
 				await this.tryRepay(this.#CDPs[i], channelName)
+				await this.#CDPs[i].updateCDPTokenInfo()
+				await this.updateBalances()
 			} else if (OCRmargin.greaterThan(new Decimal(this.#config.mOCR.borrow).dividedBy(100))) {
-				console.log()
 				await this.shortMore(this.#CDPs[i], channelName)
+				await this.#CDPs[i].updateCDPTokenInfo()
+				await this.updateBalances()
 			}
 		}
 
@@ -280,6 +275,7 @@ export class Bot {
 		) {
 			// Use fractionToMirFarm of deposits to increase MIR farm
 			await this.useDepositsToFarm(channelName)
+			await this.updateBalances()
 		}
 	}
 
@@ -434,6 +430,7 @@ export class Bot {
 			}
 			console.log(`Broadcasting transactions`)
 			await this.broadcast(channelName)
+			await this.updateBalances()
 		} else if (this.#anchorCDP.LTV.lessThan(this.#config.ltv.borrow)) {
 			const toBorrow = await this.#anchorCDP.computeAmountToBorrow()
 			console.log('you can borrow more againt your luna')
@@ -441,6 +438,7 @@ export class Bot {
 			this.toBroadcast(this.#anchorCDP.computeDepositMessage(toBorrow), channelName)
 			console.log(`Broadcasting Anchor borrow and deposit transactions`)
 			await this.broadcast(channelName)
+			await this.updateBalances()
 		}
 	}
 
@@ -632,13 +630,6 @@ export class Bot {
 		return new Promise((resolve) => setTimeout(resolve, ms))
 	}
 }
-
-// const shortValue = ((CDPLTV.times(usableCredit.plus(collateralValue))).minus(lentValue)).dividedBy((new Decimal(2).times(someCDP.premium.times(CDPLTV)).plus(new Decimal(1))))
-// 				const amountMinted = shortValue.dividedBy(someCDP.assetPrice)
-// 				console.log(`shortvalue of ${shortValue}`)
-// 				const neededaUST = ((lentValue.plus(shortValue)).dividedBy(CDPLTV)).minus(collateralValue)	//((usableCredit.plus(lentValue)).minus(someCDP.premium.times(CDPLTV).times(2).times(collateralValue))).dividedBy(new Decimal(1).plus(someCDP.premium.times(2).times(CDPLTV)))
-// 				const neededUST = shortValue.times(new Decimal(2).times(someCDP.premium))
-// 				console.log(`credit of ${usableCredit} aUST/UST ${neededaUST}, ${neededUST} totaling ${neededUST.plus(neededaUST)}`)
 
 // 				console.log(`Usable credit of ${usableCredit}, Lent value of ${lentValue} and collateral value of ${collateralValue} which results in a LTV of ${CDPLTV} with a needed aUST and UST of ${neededaUST}, ${neededUST} and a collateral price of ${someCDP.collateralPrice}`)
 // 				this.toBroadcast(someCDP.constructCollateralDepositMsg(neededaUST), channelName)
