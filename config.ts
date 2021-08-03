@@ -36,7 +36,7 @@ export default {
 	denom: 'uusd',
 
 	// The LPs you want the bot to handle 
-	LPs: ['mTSLA', 'mABNB', 'mBTC'],
+	LPs: ['mTSLA', 'mABNB', 'mCOIN'],
 
 	// Safety margin in percentage (liquidation LTV - max LTV) = 15%
 	// example, TSLA mint is liquidated when LTV > 50% so with a 15% margin the script will repay some TSLA at 35% LTV
