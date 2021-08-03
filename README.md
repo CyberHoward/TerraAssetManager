@@ -29,7 +29,7 @@ It uses this data to enshure solvency and maximize yield with the following prio
     
     
 2. Mirror CDP
-  collateralization ratio determined using asset+collateral minimum collateralization ration and an added margin (config.mOCR)
+  collateralization ratio determined using asset+collateral minimum collateralization ratio and an added margin (config.mOCR)
   Asset must be mintable (trading hours)
   
   Margin smaller then config.mORC.limit: Burn mAsset to CDP
@@ -50,6 +50,10 @@ It uses this data to enshure solvency and maximize yield with the following prio
   - Long farm mAsset
 
 <br />
+
+## Tips
+
+To maximize capital efficiency it is recomended to select an asset with a low minimum collateralization ratio. While delta neutral strategies offer no price exposure, you are still vulnerable to impermanent loss. Therefore low-volatility assets are preffered. 
 
 ## Installation
 
@@ -85,6 +89,13 @@ If you would like to try the bot before running in production, you may want to u
 You can add fake money to your Testnet Wallet using https://faucet.terra.money/.
 
 <br />
+
+## Testing
+
+Additions:
+- Autoclaim & compound rewards
+- Autoclaim locked UST from shorting
+- Prevent shorting on CDPs with locked funds (resets unlock timer) 
 
 ## Support
 
