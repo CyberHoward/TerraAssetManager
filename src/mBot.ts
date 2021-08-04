@@ -195,6 +195,7 @@ export class Bot {
 		await this.updateBalances()
 		if (this.#cash.lessThan(100)) {
 			await this.getSomeUST(100, channelName)
+			await this.updateBalances()
 		}
 		await this.updateCDPs(channelName)
 		this.#counter++
@@ -654,7 +655,7 @@ export class Bot {
 		if (this.#savings.greaterThan(amount)) {
 			this.toBroadcast(this.#anchorCDP.computeWithdrawMessage(new Decimal(100)), channelName)
 		} else {
-			this.withdrawMirrorCapital(new Decimal(amount), channelName)
+			await this.withdrawMirrorCapital(new Decimal(amount), channelName)
 		}
 		await this.broadcast(channelName)
 	}
