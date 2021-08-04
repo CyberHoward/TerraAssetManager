@@ -17,7 +17,7 @@ export class AnchorCDP {
 		this.#wallet = wallet
 		this.#anchor = anchor
 		this.#denom = denom
-		this.#config = config
+		this.#config = config 
 		this.lentValue = new Decimal(0)
 		this.LTV = new Decimal(0)
 	}

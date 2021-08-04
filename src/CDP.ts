@@ -39,16 +39,18 @@ export class CDP {
 		this.assetAdress = this.#mirrorClient.assets[this.assetName].token.contractAddress as string
 		this.#denom = denom
 		this.#time = new Date()
-		this.mintable = false
+		this.mintable = true
 		this.#marketOpenParams = [0, 0]
 		this.isShort = isShort
 		this.hasLockedUST = false
 	}
 
-	async updateCDPTokenInfo(): Promise<void> {
+	async setCDPTokenInfo(): Promise<void> {
 		try {
-			await this.setCollateralAssetInfo()
-			await this.setAssetAndCollateralInfo()
+			await this.setCollateralInfo()
+			await this.setAssetAndCollateralAmount()
+			await this.updateAssetAndCollateralPrice()
+			await this.updateOpenMarketParam()
 		} catch (err) {
 			console.error('Updating CDP token info failed: ' + err)
 		}
@@ -56,26 +58,27 @@ export class CDP {
 
 	async updateAndGetRelativeOCR(): Promise<Decimal | undefined> {
 		try {
-			this.collateralPrice = new Decimal(
-				(await this.#mirrorClient.collateralOracle.getCollateralPrice(this.collateralName)).rate
-			)
-			const priceData = await this.#mirrorClient.oracle.getPrice(this.#denom, this.assetAdress)
-			if (this.#marketOpenParams[1] != priceData.last_updated_quote) {
-				this.#marketOpenParams[0] = this.#time.getTime()
-				this.#marketOpenParams[1] = priceData.last_updated_quote
-				this.mintable = true
-			} else if (this.#marketOpenParams[0] <= this.#time.getTime() - 120000) {
-				this.mintable = false
-			}
-			this.assetPrice = new Decimal(1 / parseFloat(priceData.rate))
-
-			const collateralValue = new Decimal(this.collateralInfo.amount)
-				.times(this.collateralPrice)
-				.dividedBy(MICRO_MULTIPLIER)
-			const lentValue = new Decimal(this.assetInfo.amount).times(this.assetPrice).dividedBy(MICRO_MULTIPLIER)
-			return collateralValue.dividedBy(lentValue.times(this.collateralMultiplier)).minus(this.minCollateralRatio)
+			await this.updateAssetAndCollateralPrice()
+			const collateralValue = this.getCollateralValue()
+			const lentValue = this.getLentValue()
+			return collateralValue.dividedBy(lentValue).minus(this.minCollateralRatio)
 		} catch (err) {
 			console.error(`Updating ${this.assetName} OCR failed: ` + err)
+		}
+	}
+
+	async updateAssetAndCollateralPrice (): Promise<void> {
+		this.collateralPrice = new Decimal(
+			(await this.#mirrorClient.collateralOracle.getCollateralPrice(this.collateralName)).rate
+		)
+		const priceData = await this.#mirrorClient.oracle.getPrice(this.#denom, this.assetAdress)
+		this.assetPrice = new Decimal(1 / parseFloat(priceData.rate))
+		if (this.#marketOpenParams[1] != priceData.last_updated_quote) {
+			this.#marketOpenParams[0] = this.#time.getTime()
+			this.#marketOpenParams[1] = priceData.last_updated_quote
+			this.mintable = true
+		} else if (this.#marketOpenParams[0] <= this.#time.getTime() - 120000) {
+			this.mintable = false
 		}
 	}
 
@@ -86,27 +89,24 @@ export class CDP {
 		).last_updated_quote
 	}
 
-	getAssetAmountToCompensate(desiredOcrMargin: Decimal): Decimal {
+	async getAssetAmountToCompensate(desiredOcrMargin: Decimal): Promise <Decimal> {
+		await this.updateAssetAndCollateralPrice()
+		await this.setPremium()
 		const goalOCR = desiredOcrMargin.add(this.minCollateralRatio)
-		const collateralValue = new Decimal(this.collateralInfo.amount)
-			.times(this.collateralPrice)
-			.dividedBy(MICRO_MULTIPLIER)
-		const lentValue = new Decimal(this.assetInfo.amount).times(this.assetPrice).dividedBy(MICRO_MULTIPLIER)
-		const currentOCR = collateralValue.dividedBy(lentValue)
+		const collateralValue = this.getCollateralValue()
+		const lentValue = this.getLentValue()
+		const currentOCR = (await this.updateAndGetRelativeOCR() as Decimal).plus(this.minCollateralRatio)
 		return lentValue
 			.minus(collateralValue.dividedBy(goalOCR.minus(currentOCR).plus(collateralValue.dividedBy(lentValue))))
 			.dividedBy(this.assetPrice)
 	}
 
-	protected async setCollateralAssetInfo(): Promise<void> {
+	protected async setCollateralInfo(): Promise<void> {
 		const collateralAssetInfo = await this.#mirrorClient.collateralOracle.getCollateralAssetInfo(this.collateralName)
-		this.collateralPrice = new Decimal(
-			(await this.#mirrorClient.collateralOracle.getCollateralPrice(this.collateralName)).rate
-		)
 		this.collateralMultiplier = parseFloat(collateralAssetInfo.multiplier)
 	}
 
-	protected async setAssetAndCollateralInfo(): Promise<void> {
+	async setAssetAndCollateralAmount(): Promise<void> {
 		const cdp = await this.#mirrorClient.mint.getPosition(this.idx)
 		this.collateralInfo = cdp.collateral
 		this.assetInfo = cdp.asset
@@ -250,15 +250,27 @@ export class CDP {
 		return new Decimal(this.collateralInfo.amount).times(this.collateralPrice).dividedBy(MICRO_MULTIPLIER)
 	}
 
-	// async tryClaimLockedFunds(){
-	//     const lockBlock = (await this.#mirrorClient.lock.getPositionLockInfo(new Decimal(this.idx))).locked_funds[0]
-	//     const lockupPeriod = (await this.#mirrorClient.lock.getConfig()).lockup_period
-	//     console.log(lockBlock)
-	//     for (let funds of lockBlock) {
-	//         console.log(`Locking period is ${lockupPeriod} with funds locked on block ${funds[0]} and current block ${parseInt((await this.#mirrorClient.lcd.tendermint.blockInfo()).block.header.height)}`)
-	//         if (funds[0] + lockupPeriod < parseInt((await this.#mirrorClient.lcd.tendermint.blockInfo()).block.header.height)){
-	//             console.log("CLAIMING")
-	//         }
-	//     }
-	// }
+	async tryClaimLockedFunds(): Promise<void> {
+		const lockBlock = (await this.#mirrorClient.lock.getPositionLockInfo(new Decimal(this.idx))).locked_funds
+		for (const i in lockBlock){
+			console.log(`UST locked on ${lockBlock[i]}`)
+		}
+		
+		
+		// const lockupPeriod = (await this.#mirrorClient.lock.getConfig()).lockup_period
+		// console.log(`Latest block is ${(await this.#mirrorClient.lcd.tendermint.blockInfo()).block.header.height}`)
+		// // for (let funds of lockBlock) {
+		// 	console.log(
+		// 		`Locking period is ${lockupPeriod} with funds locked on block ${funds[0]} and current block ${parseInt(
+		// 			(await this.#mirrorClient.lcd.tendermint.blockInfo()).block.header.height
+		// 		)}`
+		// 	)
+		// 	if (
+		// 		funds[0] + lockupPeriod <
+		// 		parseInt((await this.#mirrorClient.lcd.tendermint.blockInfo()).block.header.height)
+		// 	) {
+		// 		console.log('CLAIMING')
+		// 	}
+		// }
+	}
 }

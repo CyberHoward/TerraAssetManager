@@ -107,7 +107,7 @@ async function main() {
 	} finally {
 		bot.stopExecution()
 	}
-	Logger.log('Bot is waiting.')
+	//Logger.log('Bot is waiting.')
 	setTimeout(main, config.options.waitFor * 1000)
 }
 
