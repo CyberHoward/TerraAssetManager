@@ -20,7 +20,7 @@ export default {
 		shouldCompoundsRewards: true,
 
 		// This define the number of SECONDS to wait between each verification.
-		waitFor: 30,
+		waitFor: 45,
 	},
 
 	ltv: {

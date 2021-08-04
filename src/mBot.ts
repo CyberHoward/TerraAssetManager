@@ -201,22 +201,6 @@ export class Bot {
 		this.#counter++
 	}
 
-	async updateBalances(): Promise<void> {
-		this.#cash = await this.getUSTBalance()
-		this.#savings = await this.#anchorCDP.getDeposit()
-	}
-
-	async getUSTBalance(): Promise<Decimal> {
-		const coins = await this.#client.bank.balance(this.#wallet.key.accAddress)
-		const ustCoin = coins.get(Denom.USD)
-
-		if (!ustCoin) {
-			return new Decimal(0)
-		}
-
-		return ustCoin.amount.dividedBy(MICRO_MULTIPLIER)
-	}
-
 	//What loans do I have?
 	async setCDPs(): Promise<void> {
 		const positions = (await this.#mirror.mint.getPositions(this.#wallet.key.accAddress)).positions
@@ -270,6 +254,7 @@ export class Bot {
 
 		// How are Mirror CDPs doing?
 		for (const i in this.#CDPs) {
+			this.#CDPs[i].setAssetAndCollateralAmount()
 			const OCRmargin = (await this.#CDPs[i].updateAndGetRelativeOCR()) as Decimal
 			console.log('OCR margin is: ' + OCRmargin)
 
@@ -278,7 +263,6 @@ export class Bot {
 				await this.updateBalances()
 			} else if (OCRmargin.greaterThan(new Decimal(this.#config.mOCR.borrow).dividedBy(100))) {
 				await this.shortMore(this.#CDPs[i], channelName)
-
 				await this.updateBalances()
 			}
 		}
@@ -317,7 +301,7 @@ export class Bot {
 					//Solution: replace price with on-chain asset price
 					console.log('broadcasting')
 					await this.broadcast(channelName)
-				} else if (assetBalance.greaterThanOrEqualTo(repayAmount)) {
+				} else if (assetBalance.dividedBy(MICRO_MULTIPLIER).greaterThanOrEqualTo(repayAmount)) {
 					// Not enough long tokens staked to repay CDP, enough tokens in wallet?
 					Logger.log('Genoeg massets om terug te betalen')
 
@@ -346,7 +330,7 @@ export class Bot {
 				)
 				await this.broadcast(channelName)
 			}
-
+			await this.sleep(10000)
 			await mCDP.setAssetAndCollateralAmount()
 		} catch (err) {
 			Logger.log(`Error in repaying CDP ${err}`)
@@ -574,6 +558,22 @@ export class Bot {
 		return undefined
 	}
 
+	async updateBalances(): Promise<void> {
+		this.#cash = await this.getUSTBalance()
+		this.#savings = await this.#anchorCDP.getDeposit()
+	}
+
+	async getUSTBalance(): Promise<Decimal> {
+		const coins = await this.#client.bank.balance(this.#wallet.key.accAddress)
+		const ustCoin = coins.get(Denom.USD)
+
+		if (!ustCoin) {
+			return new Decimal(0)
+		}
+
+		return ustCoin.amount.dividedBy(MICRO_MULTIPLIER)
+	}
+
 	stopExecution(): void {
 		this.#status = 'IDLE'
 	}
@@ -593,7 +593,6 @@ export class Bot {
 
 	private async broadcast(channelName: ChannelName) {
 		try {
-			console.log('Sending these transactions')
 			for (const j in this.#txChannels[channelName]) {
 				console.log(this.#txChannels[channelName][j])
 			}
