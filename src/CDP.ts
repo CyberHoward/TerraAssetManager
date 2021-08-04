@@ -67,7 +67,7 @@ export class CDP {
 		}
 	}
 
-	async updateAssetAndCollateralPrice (): Promise<void> {
+	async updateAssetAndCollateralPrice(): Promise<void> {
 		this.collateralPrice = new Decimal(
 			(await this.#mirrorClient.collateralOracle.getCollateralPrice(this.collateralName)).rate
 		)
@@ -89,13 +89,13 @@ export class CDP {
 		).last_updated_quote
 	}
 
-	async getAssetAmountToCompensate(desiredOcrMargin: Decimal): Promise <Decimal> {
+	async getAssetAmountToCompensate(desiredOcrMargin: Decimal): Promise<Decimal> {
 		await this.updateAssetAndCollateralPrice()
 		await this.setPremium()
 		const goalOCR = desiredOcrMargin.add(this.minCollateralRatio)
 		const collateralValue = this.getCollateralValue()
 		const lentValue = this.getLentValue()
-		const currentOCR = (await this.updateAndGetRelativeOCR() as Decimal).plus(this.minCollateralRatio)
+		const currentOCR = ((await this.updateAndGetRelativeOCR()) as Decimal).plus(this.minCollateralRatio)
 		return lentValue
 			.minus(collateralValue.dividedBy(goalOCR.minus(currentOCR).plus(collateralValue.dividedBy(lentValue))))
 			.dividedBy(this.assetPrice)
@@ -252,11 +252,10 @@ export class CDP {
 
 	async tryClaimLockedFunds(): Promise<void> {
 		const lockBlock = (await this.#mirrorClient.lock.getPositionLockInfo(new Decimal(this.idx))).locked_funds
-		for (const i in lockBlock){
+		for (const i in lockBlock) {
 			console.log(`UST locked on ${lockBlock[i]}`)
 		}
-		
-		
+
 		// const lockupPeriod = (await this.#mirrorClient.lock.getConfig()).lockup_period
 		// console.log(`Latest block is ${(await this.#mirrorClient.lcd.tendermint.blockInfo()).block.header.height}`)
 		// // for (let funds of lockBlock) {
