@@ -3,3 +3,4 @@ package-lock.json
 .env
 .env2
 .env3
+config.ts
