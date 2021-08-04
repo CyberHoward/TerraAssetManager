@@ -10,7 +10,6 @@ import {
 	DEFAULT_MIRROR_OPTIONS,
 	Mirror,
 	TerraswapToken,
-	MirrorLock,
 } from '@mirror-protocol/mirror.js'
 import { Logger } from './Logger'
 import { CDP } from './CDP'
