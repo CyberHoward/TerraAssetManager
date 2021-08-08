@@ -38,8 +38,8 @@ export default {
 	// The LPs you want the bot to handle
 	LPs: ['mCOIN', 'mBTC', 'mSLV'],
 
-	// Safety margin in percentage (liquidation LTV - max LTV) = 15%
-	// example, TSLA mint is liquidated when LTV > 50% so with a 15% margin the script will repay some TSLA at 35% LTV
+	// DCP OCR is (minimum collateralisation ratio + mOCR), when mOCR goes below limit, bot repays in mAsset, when mOCR exceeds borrow, bot borrows more mAssets and LPs them.
+	// example, TSLA short CDP is liquidated when OCR < 150% so with a 6% limit the script will repay some TSLA when OCR = 156% and bring the OCR to 162 (150 + safe(12)).
 	mOCR: {
 		limit: 6,
 
@@ -48,9 +48,9 @@ export default {
 		borrow: 20,
 	},
 
-	// Max UST in anchor / lentUST in %
-	// When this margin is exceeded fractionToMirFarm% of the deposits are used to increase MIR farming.
-	maxDepositToLentRatio: 40,
+	// We want some aUST in anchor to handle LUNA volatility. Freeing up capital form MIR exposes us to a 1.5% CDP burn fee.  
+	// When aUST depost value divided by UST depost value exceeds 40%, then 10% of borrowed value is used to farm on Mirror. 
+	maxDepositToBorrowRatio: 40,
 
 	fractionToMirFarm: 10,
 

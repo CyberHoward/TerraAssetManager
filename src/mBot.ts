@@ -222,7 +222,7 @@ export class Bot {
 							'uusd'
 						)
 					)
-					await this.#CDPs[l - 1].updateOpenMarketParam()
+					await this.#CDPs[l - 1].setOpenMarketParam()
 					await this.#CDPs[l - 1].setCDPTokenInfo()
 					await this.#CDPs[l - 1].updateAndGetRelativeOCR()
 					await this.#CDPs[l - 1].setPremium()
@@ -259,7 +259,7 @@ export class Bot {
 		if (
 			this.#savings
 				.dividedBy(this.#anchorCDP.lentValue)
-				.greaterThan(new Decimal(this.#config.maxDepositToLentRatio).dividedBy(100))
+				.greaterThan(new Decimal(this.#config.maxDepositToBorrowRatio).dividedBy(100))
 		) {
 			// Use fractionToMirFarm of deposits to increase MIR farm
 			await this.useDepositsToFarm(channelName)
@@ -289,14 +289,14 @@ export class Bot {
 
 					this.toBroadcast(mCDP.contructUnstakeMsg(LPtoBurn), channelName)
 					this.toBroadcast(mCDP.constructUnbondMsg(LPtoBurn), channelName)
-					this.toBroadcast(await mCDP.constructBurnMsg(repayAmount), channelName)
+					this.toBroadcast(mCDP.constructBurnMsg(repayAmount), channelName)
 
 					console.log('broadcasting')
 					await this.broadcast(channelName)
 				} else if (assetBalance.dividedBy(MICRO_MULTIPLIER).greaterThanOrEqualTo(repayAmount)) {
 					// Not enough long tokens staked to repay CDP, enough tokens in wallet?
 
-					this.toBroadcast(await mCDP.constructBurnMsg(repayAmount), channelName)
+					this.toBroadcast(mCDP.constructBurnMsg(repayAmount), channelName)
 
 					console.log('broadcasting')
 					await this.broadcast(channelName)
@@ -452,7 +452,7 @@ export class Bot {
 			.plus(
 				this.#savings
 					.dividedBy(this.#anchorCDP.lentValue)
-					.minus(new Decimal(this.#config.maxDepositToLentRatio).dividedBy(100))
+					.minus(new Decimal(this.#config.maxDepositToBorrowRatio).dividedBy(100))
 			)
 			.times(this.#anchorCDP.lentValue)
 		if (someCDP != undefined) {
@@ -534,7 +534,7 @@ export class Bot {
 				)
 				this.toBroadcast(targetCDP.contructUnstakeMsg(LPtoBurn), channelName)
 				this.toBroadcast(targetCDP.constructUnbondMsg(LPtoBurn), channelName)
-				this.toBroadcast(await targetCDP.constructBurnMsg(mAssetToBurn), channelName)
+				this.toBroadcast(targetCDP.constructBurnMsg(mAssetToBurn), channelName)
 				this.toBroadcast(targetCDP.constructWithdrawMsg(collateralWithdrawValue), channelName)
 				//await this.broadcast(channelName)
 

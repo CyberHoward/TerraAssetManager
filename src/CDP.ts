@@ -45,16 +45,52 @@ export class CDP {
 		this.hasLockedUST = false
 	}
 
+	// SET FUNCTIONS
+
 	async setCDPTokenInfo(): Promise<void> {
 		try {
 			await this.setCollateralInfo()
 			await this.setAssetAndCollateralAmount()
 			await this.updateAssetAndCollateralPrice()
-			await this.updateOpenMarketParam()
+			await this.setOpenMarketParam()
 		} catch (err) {
 			console.error('Updating CDP token info failed: ' + err)
 		}
 	}
+
+	protected async setCollateralInfo(): Promise<void> {
+		const collateralAssetInfo = await this.#mirrorClient.collateralOracle.getCollateralAssetInfo(this.collateralName)
+		this.collateralMultiplier = parseFloat(collateralAssetInfo.multiplier)
+	}
+
+	async setAssetAndCollateralAmount(): Promise<void> {
+		const cdp = await this.#mirrorClient.mint.getPosition(this.idx)
+		this.collateralInfo = cdp.collateral
+		this.assetInfo = cdp.asset
+		this.minCollateralRatio =
+			parseFloat(
+				(await this.#mirrorClient.mint.getAssetConfig(this.assetInfo.info.token.contract_addr)).min_collateral_ratio
+			) * this.collateralMultiplier
+	}
+
+	async setOpenMarketParam(): Promise<void> {
+		this.#marketOpenParams[0] = this.#time.getTime()
+		this.#marketOpenParams[1] = (
+			await this.#mirrorClient.oracle.getPrice(this.#denom, this.assetAdress)
+		).last_updated_quote
+	}
+
+	async setPremium(): Promise<void> {
+		const pair = new TerraswapPair({
+			contractAddress: this.#mirrorClient.assets[this.assetName].pair.contractAddress,
+			lcd: this.#mirrorClient.lcd,
+		})
+		const poolInfo = await pair.getPool()
+		const onChainPrice = new Decimal(poolInfo.assets[0].amount).dividedBy(new Decimal(poolInfo.assets[1].amount))
+		this.premium = onChainPrice.minus(this.assetPrice).dividedBy(this.assetPrice).plus(new Decimal(1))
+	}
+
+	// UPDATE FUNCTIONS	
 
 	async updateAndGetRelativeOCR(): Promise<Decimal | undefined> {
 		try {
@@ -82,11 +118,14 @@ export class CDP {
 		}
 	}
 
-	async updateOpenMarketParam(): Promise<void> {
-		this.#marketOpenParams[0] = this.#time.getTime()
-		this.#marketOpenParams[1] = (
-			await this.#mirrorClient.oracle.getPrice(this.#denom, this.assetAdress)
-		).last_updated_quote
+	// GETTER FUNCTIONS
+
+	getLentValue(): Decimal {
+		return new Decimal(this.assetInfo.amount).times(this.assetPrice).dividedBy(MICRO_MULTIPLIER)
+	}
+
+	getCollateralValue(): Decimal {
+		return new Decimal(this.collateralInfo.amount).times(this.collateralPrice).dividedBy(MICRO_MULTIPLIER)
 	}
 
 	async getAssetAmountToCompensate(desiredOcrMargin: Decimal): Promise<Decimal> {
@@ -101,20 +140,7 @@ export class CDP {
 			.dividedBy(this.assetPrice)
 	}
 
-	protected async setCollateralInfo(): Promise<void> {
-		const collateralAssetInfo = await this.#mirrorClient.collateralOracle.getCollateralAssetInfo(this.collateralName)
-		this.collateralMultiplier = parseFloat(collateralAssetInfo.multiplier)
-	}
-
-	async setAssetAndCollateralAmount(): Promise<void> {
-		const cdp = await this.#mirrorClient.mint.getPosition(this.idx)
-		this.collateralInfo = cdp.collateral
-		this.assetInfo = cdp.asset
-		this.minCollateralRatio =
-			parseFloat(
-				(await this.#mirrorClient.mint.getAssetConfig(this.assetInfo.info.token.contract_addr)).min_collateral_ratio
-			) * this.collateralMultiplier
-	}
+	
 
 	async getOnchainReverseSim(shortAmount: Decimal): Promise<Decimal> {
 		const pair = new TerraswapPair({
@@ -131,8 +157,10 @@ export class CDP {
 		)
 	}
 
-	async constructBurnMsg(mAssetToRepay: Decimal): Promise<MsgExecuteContract> {
-		const asset = (await this.#mirrorClient.mint.getPosition(this.idx)).asset
+	// MSG CONSTRUCT FUNCTIONS
+
+	constructBurnMsg(mAssetToRepay: Decimal): MsgExecuteContract {
+		const asset = this.assetInfo
 		asset.amount = mAssetToRepay.times(MICRO_MULTIPLIER).toFixed(0)
 		return this.#mirrorClient.mint.burn(this.idx, asset)
 	}
@@ -169,6 +197,13 @@ export class CDP {
 		)
 	}
 
+	constructWithdrawMsg(collateralWithdrawValue: Decimal): MsgExecuteContract {
+		const cInfo = this.collateralInfo
+		cInfo.amount = collateralWithdrawValue.dividedBy(this.collateralPrice).times(MICRO_MULTIPLIER).toFixed(0)
+
+		return this.#mirrorClient.mint.withdraw(new Decimal(this.idx), cInfo)
+	}
+
 	constructBuyAndLPMsg(amount: Decimal, swapUST: Decimal, LPUST: Decimal): MsgExecuteContract[] {
 		const denomAsset: Asset<NativeToken> = {
 			info: <NativeToken>{ native_token: { denom: Denom.USD } },
@@ -185,13 +220,6 @@ export class CDP {
 		const tokenAddress = tokenAsset.info.token.contract_addr
 		const coins = new Coins([new Coin(denomAsset.info.native_token.denom, denomAsset.amount)])
 
-		// console.log(
-		// 	`LPing ${amount} with a value of ${amount.times(
-		// 		this.assetPrice.times(this.premium)
-		// 	)} together with ${LPUST} UST which gives a price of ${LPUST.dividedBy(
-		// 		amount
-		// 	)} and an on-chain price of ${this.assetPrice.times(this.premium)} which has a premium of ${this.premium}.`
-		// )
 		return [
 			new MsgExecuteContract(address, tokenAddress, {
 				// Increase contract allowance
@@ -224,52 +252,13 @@ export class CDP {
 			this.#mirrorClient.staking.autoStake(LPust, tokenAsset),
 		]
 	}
-
-	async setPremium(): Promise<void> {
-		const pair = new TerraswapPair({
-			contractAddress: this.#mirrorClient.assets[this.assetName].pair.contractAddress,
-			lcd: this.#mirrorClient.lcd,
-		})
-		const poolInfo = await pair.getPool()
-		const onChainPrice = new Decimal(poolInfo.assets[0].amount).dividedBy(new Decimal(poolInfo.assets[1].amount))
-		this.premium = onChainPrice.minus(this.assetPrice).dividedBy(this.assetPrice).plus(new Decimal(1))
-	}
-
-	constructWithdrawMsg(collateralWithdrawValue: Decimal): MsgExecuteContract {
-		const cInfo = this.collateralInfo
-		cInfo.amount = collateralWithdrawValue.dividedBy(this.collateralPrice).times(MICRO_MULTIPLIER).toFixed(0)
-
-		return this.#mirrorClient.mint.withdraw(new Decimal(this.idx), cInfo)
-	}
-
-	getLentValue(): Decimal {
-		return new Decimal(this.assetInfo.amount).times(this.assetPrice).dividedBy(MICRO_MULTIPLIER)
-	}
-
-	getCollateralValue(): Decimal {
-		return new Decimal(this.collateralInfo.amount).times(this.collateralPrice).dividedBy(MICRO_MULTIPLIER)
-	}
-
+	
+	// NOT  WORKING, locked_funds is undefined. 
 	async tryClaimLockedFunds(): Promise<void> {
 		const lockBlock = (await this.#mirrorClient.lock.getPositionLockInfo(new Decimal(this.idx))).locked_funds
 		for (const i in lockBlock) {
 			console.log(`UST locked on ${lockBlock[i]}`)
 		}
 
-		// const lockupPeriod = (await this.#mirrorClient.lock.getConfig()).lockup_period
-		// console.log(`Latest block is ${(await this.#mirrorClient.lcd.tendermint.blockInfo()).block.header.height}`)
-		// // for (let funds of lockBlock) {
-		// 	console.log(
-		// 		`Locking period is ${lockupPeriod} with funds locked on block ${funds[0]} and current block ${parseInt(
-		// 			(await this.#mirrorClient.lcd.tendermint.blockInfo()).block.header.height
-		// 		)}`
-		// 	)
-		// 	if (
-		// 		funds[0] + lockupPeriod <
-		// 		parseInt((await this.#mirrorClient.lcd.tendermint.blockInfo()).block.header.height)
-		// 	) {
-		// 		console.log('CLAIMING')
-		// 	}
-		// }
 	}
 }
