@@ -57,6 +57,9 @@ Once you have `node` and `npm` accessible in your terminal's path, you will need
 4. Run the bot with `npm run start`.
 
 > :information_source: We recommend using a tool like [`pm2`](https://github.com/Unitech/pm2) to run the bot in a background process.
+> Another workaround is to use tmux
+
+If you run this bot and you don't use pm2 or tmux and close the terminal, the bot will terminate.
 
 <br />
 
