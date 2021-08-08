@@ -407,6 +407,8 @@ export class Bot {
 			this.#savings = await this.#anchorCDP.getDeposit()
 			console.log('aUST is deposited and UST is made available for farming, now you can short more. ')
 			await this.shortMore(someCDP, channelName)
+		} else {
+			console.log("Asset not mintable or no CDP found.")
 		}
 	}
 
