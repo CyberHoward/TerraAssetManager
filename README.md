@@ -18,7 +18,12 @@ It uses this data to enshure solvency and maximize yield with the following prio
    LTV higher then config.ltv.limit: Repayment needed
    - Enough cash (UST) on hand?
    - Enough savings (aUST) on hand?
-   - Get UST from Mirror positions - Unstake and withdraw needed LP from largest CDP asset (yields mAsset and UST) (1) - Burn mAsset to short CDP (decreases CDP LTV) (1) - Withdraw CDP collateral (aUST) to return CDP LTV to the same level as before. - Withdraw claimed aUST from Anchor and repay loan.
+   - Get UST from Mirror positions 
+      - Unstake and withdraw needed LP from largest CDP asset (yields mAsset and UST) (1) 
+      - Burn mAsset to short CDP (decreases CDP LTV) (1) 
+      - Withdraw CDP collateral (aUST) to return CDP LTV to the same level as before.  
+      - Withdraw claimed aUST from Anchor and repay loan.
+     
      LTV lower then config.ltv.borrow: Borrow more
    - Borrow UST and deposit to Anchor
 2. Mirror CDP
@@ -80,9 +85,7 @@ You can add fake money to your Testnet Wallet using https://faucet.terra.money/.
 
 <br />
 
-## Testing
-
-Additions:
+## Future additions
 
 - Autoclaim & compound rewards
 - Autoclaim locked UST from shorting
