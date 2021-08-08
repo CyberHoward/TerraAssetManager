@@ -26,7 +26,7 @@ export class AnchorCDP {
 		const borrowedValue = await this.getBorrowedValue()
 		this.lentValue = borrowedValue
 		const borrowLimit = await this.getBorrowLimit()
-		this.LTV = borrowedValue.dividedBy(borrowLimit.dividedBy(0.6)).times(100)
+		this.LTV = borrowedValue.dividedBy(borrowLimit.dividedBy(0.6)).times(100) // 0.6 should be calculated (could change in through governance)
 	}
 
 	async computeAmountToRepay(target = this.#config.ltv.safe): Promise<Decimal> {
@@ -78,7 +78,8 @@ export class AnchorCDP {
 
 	computeWithdrawMessage(amount: Decimal): Msg[] {
 		return this.#anchor.earn
-			.withdrawStable({ amount: amount.toFixed(3), market: MARKET_DENOMS.UUSD })
+			.withdrawStable({ amount: amount.toFixed(3), market: MARKET_DENOMS.UUSD }) 
+			//Problem -> amount is amount in aUST so every call must calculate aUST amount to get certain amount of UST, which sucks.
 			.generateWithWallet(this.#wallet)
 	}
 
