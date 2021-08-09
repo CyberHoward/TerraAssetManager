@@ -49,6 +49,7 @@ export class Bot {
 	constructor(config: any) {
 		this.#config = config
 		this.#counter = 0
+		
 		// Initialization of the Terra Client
 		this.#client = new LCDClient({
 			URL: this.#config.lcdUrl,
