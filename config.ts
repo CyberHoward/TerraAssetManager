@@ -36,7 +36,7 @@ export default {
 	denom: 'uusd',
 
 	// The LPs you want the bot to handle
-	LPs: ['mCOIN', 'mBTC', 'mSLV'],
+	LPs: ['mTWTR', 'mBTC', 'mSLV'],
 
 	// DCP OCR is (minimum collateralisation ratio + mOCR), when mOCR goes below limit, bot repays in mAsset, when mOCR exceeds borrow, bot borrows more mAssets and LPs them.
 	// example, TSLA short CDP is liquidated when OCR < 150% so with a 6% limit the script will repay some TSLA when OCR = 156% and bring the OCR to 162 (150 + safe(12)).

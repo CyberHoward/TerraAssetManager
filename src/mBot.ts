@@ -3,7 +3,7 @@
 import { dset } from 'dset'
 import dedent from 'dedent-js'
 import Decimal from 'decimal.js'
-import { Denom, LCDClient, MnemonicKey, Msg, Wallet } from '@terra-money/terra.js'
+import { Dec, Denom, LCDClient, MnemonicKey, Msg, Wallet } from '@terra-money/terra.js'
 import { AddressProviderFromJson, Anchor, columbus4, MARKET_DENOMS, tequila0004 } from '@anchor-protocol/anchor.js'
 import {
 	DEFAULT_TEQUILA_MIRROR_OPTIONS,
@@ -302,14 +302,23 @@ export class Bot {
 				)
 				this.toBroadcast(this.#anchorCDP.computeRepayMessage(toRepay), channelName)
 				console.log(`Repaying Anchor with Anchor Deposits`)
-			} else {
-				//Try free up capital from Mirror farms
-				console.log(`Repaying Anchor with UST from Mirror farms`)
-				const cdp = await this.withdrawMirrorCapital(toRepay, channelName)
+			} else if (this.#cash.plus(this.#savings).plus(15).greaterThan(toRepay)){
+				this.toBroadcast(
+					this.#anchorCDP.computeWithdrawMessage(
+						this.#savings.dividedBy(
+							(await this.#mirror.collateralOracle.getCollateralPrice(this.#addressProvider.aTerra())).rate
+						)
+					),
+					channelName
+				)
 				this.toBroadcast(this.#anchorCDP.computeRepayMessage(toRepay), channelName)
-				if (cdp != undefined) {
-					cdp.setAssetAndCollateralAmount()
-				}
+				console.log(`Savings + cash is enough to repay ${toRepay}`)
+
+			}else {
+				//Try free up capital from Mirror farms
+				await this.getSomeUST(toRepay.toNumber(), channelName)
+				this.toBroadcast(this.#anchorCDP.computeRepayMessage(toRepay), channelName)
+				
 			}
 			console.log(`Broadcasting transactions`)
 			await this.broadcast(channelName)
@@ -330,10 +339,29 @@ export class Bot {
 	async getSomeUST(amount: number, channelName: ChannelName) {
 		if (this.#savings.greaterThan(amount)) {
 			this.toBroadcast(this.#anchorCDP.computeWithdrawMessage(new Decimal(100)), channelName)
+			await this.broadcast(channelName)
 		} else {
-			await this.withdrawMirrorCapital(new Decimal(amount), channelName)
+			console.log(`Withdrawing all aUST and getting the rest from Mirror`)
+			if(this.#savings.greaterThan(10)){
+				this.toBroadcast(
+					this.#anchorCDP.computeWithdrawMessage(
+						this.#savings.dividedBy(
+							(await this.#mirror.collateralOracle.getCollateralPrice(this.#addressProvider.aTerra())).rate
+						)
+					),
+					channelName
+				)
+				console.log(`Withdrawing ${this.#savings} from anchor with aUST price ${(await this.#mirror.collateralOracle.getCollateralPrice(this.#addressProvider.aTerra())).rate}`)
+				await this.broadcast(channelName)
+				await this.updateBalances()
+			}
+				
+			const cdp = await this.withdrawMirrorCapital(new Decimal(amount).minus(this.#cash.minus(10)), channelName)
+			if (cdp != undefined) {
+				cdp.setAssetAndCollateralAmount()
+			}
 		}
-		await this.broadcast(channelName)
+		
 	}
 
 	async shortMore(mCDP: CDP, channelName: ChannelName): Promise<void> {
@@ -365,6 +393,7 @@ export class Bot {
 	}
 
 	async useDepositsToFarm(channelName: ChannelName): Promise<void> {
+		// TODO: First check if mAssets in wallet that can be longLP'd
 		console.log('We can use aUST for mir farm')
 		const someCDP = this.#CDPs.find((cdp) => cdp.mintable && cdp.isShort)
 		const usableCredit = new Decimal(this.#config.fractionToMirFarm / 100)
@@ -414,6 +443,7 @@ export class Bot {
 
 	async withdrawMirrorCapital(neededUST: Decimal, channelName: ChannelName): Promise<CDP | undefined> {
 		console.log(`Need ${neededUST} UST to repay Anchor`)
+		// First try to unstake LP or do that as last resort? 
 		const collateralValues = this.#CDPs.map((cdp) => {
 			if (cdp.mintable) {
 				return cdp.getCollateralValue().toNumber()
@@ -429,7 +459,7 @@ export class Bot {
 			const lentValue = targetCDP.getLentValue()
 			const collateralValue = targetCDP.getCollateralValue()
 			const LTV = lentValue.dividedBy(collateralValue)
-			// CDP collateral + lentValue ~ total vault value since long farm UST ~ lent value
+			// CDP collateral + lentValue ~ total vault value since long farm UST ~ lent value, total vault value must be more then needed UST
 			if (collateralValues[biggestCDPidx] != 0 && collateralValue.plus(lentValue).greaterThan(neededUST)) {
 				await targetCDP.setPremium()
 				const mAssetValueToBurn = LTV.times(neededUST.times(-1).plus(collateralValue))
@@ -457,14 +487,21 @@ export class Bot {
 				this.toBroadcast(targetCDP.constructUnbondMsg(LPtoBurn), channelName)
 				this.toBroadcast(targetCDP.constructBurnMsg(mAssetToBurn), channelName)
 				this.toBroadcast(targetCDP.constructWithdrawMsg(collateralWithdrawValue), channelName)
-				//await this.broadcast(channelName)
-
+				
 				this.toBroadcast(
 					this.#anchorCDP.computeWithdrawMessage(collateralWithdrawValue.dividedBy(targetCDP.collateralPrice)),
 					channelName
 				) 
+				await this.broadcast(channelName)
 				
 				return targetCDP
+			} else {
+				// No mintable CDP availabe 
+				// Just try to unstake LP
+				const remaining = await this.unstakeNeeded(neededUST, channelName)
+				if(remaining.greaterThan(0)){
+					// Start selling assets 
+				}
 			}
 		}
 		return undefined
@@ -586,6 +623,35 @@ export class Bot {
 			console.log('Error in getting pool information: ' + err)
 			return new Decimal(0)
 		}
+	}
+
+	async unstakeNeeded(neededUST: Decimal, channelName: ChannelName): Promise<Decimal>{ //Improve, should not unstake all the LP in the first place
+		let lastBalance = this.#cash
+		let remaining = neededUST
+		for(const g in this.#CDPs){
+			if(remaining.floor().greaterThanOrEqualTo(0)){
+				let LPs = (await this.#mirror.staking.getRewardInfo(this.#wallet.key.accAddress, this.#CDPs[g].assetAdress)).reward_infos
+				for (const i in LPs) {
+					if (!LPs[i].is_short) {
+						await this.#CDPs[g].setPremium()
+						await this.#CDPs[g].updateAssetAndCollateralPrice()
+						let LPmAssetNeeded = remaining.dividedBy(this.#CDPs[g].assetPrice.times(this.#CDPs[g].premium))
+						let LPStaked = await this.sufficientStaked(this.#CDPs[g].assetAdress,LPmAssetNeeded,this.#CDPs[g].assetPrice.times(this.#CDPs[g].premium))
+						if(LPStaked == new Decimal(0)){
+							LPStaked = new Decimal(LPs[i].bond_amount)
+						}
+						this.toBroadcast(this.#CDPs[g].contructUnstakeMsg(LPStaked), channelName)
+						this.toBroadcast(this.#CDPs[g].constructUnbondMsg(LPStaked), channelName)
+
+						await this.broadcast(channelName)
+						let lastBalance = this.#cash
+						await this.updateBalances()
+						remaining = remaining.minus(this.#cash.minus(lastBalance)) // Balance should have increased. 
+					}
+				}
+			}
+		}
+		return remaining
 	}
 
 	// HELPER FUNCTIONS
