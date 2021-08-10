@@ -252,6 +252,29 @@ export class CDP {
 			this.#mirrorClient.staking.autoStake(LPust, tokenAsset),
 		]
 	}
+
+	stakeLP(mamount: Decimal, LPUST: Decimal): MsgExecuteContract[] {
+		const LPust: Asset<NativeToken> = {
+			info: <NativeToken>{ native_token: { denom: Denom.USD } },
+			amount: LPUST.times(MICRO_MULTIPLIER).toFixed(0),
+		}
+		const tokenAsset: Asset<Token> = { info: this.assetInfo.info, amount: mamount.times(MICRO_MULTIPLIER).toFixed(0) }
+		const address = this.#mirrorClient.key.accAddress
+		const tokenAddress = tokenAsset.info.token.contract_addr
+
+		return [
+			new MsgExecuteContract(address, tokenAddress, {
+				// Increase contract allowance
+				increase_allowance: {
+					spender: this.#mirrorClient.staking.contractAddress,
+					amount: tokenAsset.amount,
+					expires: { never: {} },
+				},
+			}),
+			this.#mirrorClient.staking.autoStake(LPust, tokenAsset),
+		]
+	}
+
 	
 	// NOT  WORKING, locked_funds is undefined. 
 	async tryClaimLockedFunds(): Promise<void> {
