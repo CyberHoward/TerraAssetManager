@@ -191,8 +191,7 @@ export class Bot {
 
 		if (this.#counter == 0) {
 			await this.setCDPs()
-
-			//await this.sleep(61000) // Wait at least 1 minute (oracle price update interval)
+			
 		} else if (this.#counter % 5 == 0) {
 			//Check if there are claimable rewards and short positions.
 		}
@@ -236,6 +235,10 @@ export class Bot {
 					
 				}
 			}
+		}
+		await this.sleep(61000)
+		for (const i in this.#CDPs) {
+			await this.#CDPs[i].updateAssetAndCollateralPrice()
 		}
 		await this.#anchorCDP.setLTV()
 		console.log('CDPs are set!')
