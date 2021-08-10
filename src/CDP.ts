@@ -178,7 +178,7 @@ export class CDP {
 	}
 
 	contructUnstakeMsg(amount: Decimal): MsgExecuteContract {
-		return this.#mirrorClient.staking.unbond(this.assetAdress, amount)
+		return this.#mirrorClient.staking.unbond(this.assetAdress, amount.toFixed(0))
 	}
 
 	constructUnbondMsg(LP_token_amount: Decimal): MsgExecuteContract {
