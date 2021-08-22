@@ -195,13 +195,17 @@ export class Bot {
 		} else if (this.#counter % 5 == 0) {
 			//Check if there are claimable rewards and short positions.
 		}
-
-		await this.updateBalances()
-		if (this.#cash.lessThan(100)) {
-			await this.getSomeUST(90, channelName)
+		try {
 			await this.updateBalances()
-		}
+			if (this.#cash.lessThan(100)) {
+				await this.getSomeUST(90, channelName)
+				await this.updateBalances()
+			}
 		await this.updateCDPs(channelName)
+		} catch(err){
+			console.log(err)
+		}
+		
 		this.#counter++
 	}
 
@@ -272,6 +276,7 @@ export class Bot {
 			}
 		}
 
+		console.log(this.#CDPs)
 		// Enough deposits to farm on Mirror?
 		if (
 			this.#savings
