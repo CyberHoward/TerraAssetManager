@@ -167,43 +167,27 @@ export class Bot {
 	// MAIN FUNCTION
 
 	async execute(goTo?: number, channelName: ChannelName = 'main'): Promise<void> {
-		if (this.#status === 'PAUSE') {
-			if (channelName === 'tgBot') {
-				Logger.log('Bot is paused, use <code>/run</code> to start it.')
-			}
-			return
-		}
-
-		if (this.#status === 'RUNNING') {
-			if (channelName === 'tgBot') {
-				Logger.log('Already running, please retry later.')
-			}
-
-			if (this.#failureCount >= 5) {
-				Logger.log('It seems that the bot is stuck! Restarting...')
-				this.pause()
-				setTimeout(() => this.run(), 1000)
-			}
-
-			this.#failureCount++
-			return
-		}
-
-		if (this.#counter == 0) {
-			await this.setCDPs()
-			
-		} else if (this.#counter % 5 == 0) {
-			//Check if there are claimable rewards and short positions.
-		}
 		try {
+			if (this.#failureCount >= 5) {
+				this.setCDPs()
+			}
+	
+			if (this.#counter == 0) {
+				await this.setCDPs()
+				
+			} else if (this.#counter % 5 == 0) {
+				//Check if there are claimable rewards and short positions.
+			}
 			await this.updateBalances()
 			if (this.#cash.lessThan(100)) {
 				await this.getSomeUST(90, channelName)
 				await this.updateBalances()
 			}
-		await this.updateCDPs(channelName)
+			await this.updateCDPs(channelName)
+			this.#failureCount = 0
 		} catch(err){
 			console.log(err)
+			this.#failureCount++
 		}
 		
 		this.#counter++
@@ -214,7 +198,7 @@ export class Bot {
 	//What loans do I have?
 	async setCDPs(): Promise<void> {
 		const positions = (await this.#mirror.mint.getPositions(this.#wallet.key.accAddress)).positions
-
+		this.#CDPs = []
 		for (const i in positions) {
 			for (const j in this.#mirror.assets) {
 				if (
@@ -276,9 +260,8 @@ export class Bot {
 			}
 		}
 
-		console.log(this.#CDPs)
 		// Enough deposits to farm on Mirror?
-		if (
+		if (this.#CDPs.length != 0 && 
 			this.#savings
 				.dividedBy(this.#anchorCDP.lentValue)
 				.greaterThan(new Decimal(this.#config.maxDepositToBorrowRatio).dividedBy(100))
@@ -286,7 +269,7 @@ export class Bot {
 			// Use fractionToMirFarm of deposits to increase MIR farm
 			await this.useDepositsToFarm(channelName)
 			await this.updateBalances()
-		}
+		} 
 	}
 
 	async maintainAnchorCDP(channelName: ChannelName): Promise<void> {
@@ -365,13 +348,13 @@ export class Bot {
 				await this.broadcast(channelName)
 				await this.updateBalances()
 			}
-				
-			const cdp = await this.withdrawMirrorCapital(new Decimal(amount).minus(this.#cash.minus(10)), channelName)
-			if (cdp != undefined) {
-				cdp.setAssetAndCollateralAmount()
-			}
+			if (this.#CDPs.length > 0 ){
+				const cdp = await this.withdrawMirrorCapital(new Decimal(amount).minus(this.#cash.minus(10)), channelName)
+				if (cdp != undefined) {
+					cdp.setAssetAndCollateralAmount()
+				}
+			}	
 		}
-		
 	}
 
 	async shortMore(mCDP: CDP, channelName: ChannelName): Promise<void> {
